@@ -1,0 +1,376 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Phone Phreak Emulator</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.7.77/Tone.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=VT323&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'VT323', monospace;
+            touch-action: manipulation;
+        }
+        .phone-body {
+            background-color: #d2b48c; /* tan */
+            border: 4px solid #8b4513; /* saddlebrown */
+            box-shadow: 10px 10px 5px rgba(0,0,0,0.5), inset 0 0 15px rgba(0,0,0,0.3);
+        }
+        .display-screen {
+            background-color: #334155; /* slate-700 */
+            border: 3px solid #1e293b; /* slate-800 */
+            color: #fde047; /* yellow-300 */
+            text-shadow: 0 0 5px #fde047, 0 0 10px #fde047;
+            padding: 1rem;
+            height: 120px;
+            overflow-y: auto;
+            font-size: 1.25rem;
+        }
+        .btn-phone {
+            transition: all 0.1s ease;
+            box-shadow: 0 4px #6b7280;
+            border-bottom: 1px solid #4b5563;
+        }
+        .btn-phone:active {
+            transform: translateY(4px);
+            box-shadow: 0 0 #6b7280;
+        }
+        .btn-hook-up {
+             background-color: #ef4444; /* red-500 */
+             border-color: #b91c1c; /* red-700 */
+        }
+        .btn-hook-down {
+             background-color: #22c55e; /* green-500 */
+             border-color: #15803d; /* green-700 */
+        }
+        .led {
+            width: 15px;
+            height: 15px;
+            border-radius: 50%;
+            transition: background-color 0.3s ease;
+        }
+        .led-off { background-color: #4b5563; box-shadow: inset 0 0 5px rgba(0,0,0,0.5);}
+        .led-on { background-color: #ef4444; box-shadow: 0 0 10px #ef4444, 0 0 20px #ef4444; }
+    </style>
+</head>
+<body class="bg-gray-800 flex items-center justify-center min-h-screen p-4">
+
+    <div class="phone-body max-w-sm w-full p-6 rounded-2xl">
+        
+        <!-- Header -->
+        <div class="text-center mb-4">
+            <h1 class="text-4xl text-gray-800">Phreak-Box 2600</h1>
+            <p class="text-gray-700">A Vintage TelCo Emulator</p>
+        </div>
+
+        <!-- Display Screen -->
+        <div id="display" class="display-screen rounded-lg mb-4 font-mono">
+            <p>> System Idle.</p>
+            <p>> Press START to begin.</p>
+        </div>
+
+        <!-- Controls and Status -->
+        <div class="flex items-center justify-between mb-4">
+            <div class="flex items-center space-x-3">
+                <div id="status-led" class="led led-off"></div>
+                <span id="status-text" class="text-lg text-gray-700">OFF-HOOK</span>
+            </div>
+            <button id="start-button" class="btn-phone bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded-lg">
+                Start
+            </button>
+        </div>
+
+        <!-- Audio Visualizer -->
+        <canvas id="visualizer" class="w-full h-20 bg-gray-900 rounded-lg mb-2"></canvas>
+        
+        <!-- Frequency Display -->
+        <div class="text-center mb-4 text-gray-700">
+            <p>Detected Frequency: <span id="freq-display" class="font-bold text-lg text-gray-800">---</span> Hz</p>
+        </div>
+
+        <!-- Tone Buttons -->
+        <div class="grid grid-cols-2 gap-4">
+            <button id="play-2600hz" class="btn-phone bg-yellow-500 hover:bg-yellow-600 text-black font-bold py-3 px-4 rounded-lg text-lg">Play 2600Hz Tone</button>
+            <button id="hangup-button" class="btn-phone btn-hook-up text-white font-bold py-3 px-4 rounded-lg text-lg">Hang Up</button>
+        </div>
+        
+        <!-- Instructions -->
+        <div class="mt-6 p-4 bg-tan-200 rounded-lg border border-gray-600 text-gray-800">
+            <h3 class="font-bold text-lg mb-2">How to Use:</h3>
+            <ol class="list-decimal list-inside text-sm space-y-1">
+                <li>Press <strong>Start</strong> to activate the system and enable your microphone.</li>
+                <li>You'll hear a dial tone. The system is now listening.</li>
+                <li><strong>Whistle</strong> or use an external source to play a <a href="https://en.wikipedia.org/wiki/2600_hertz" target="_blank" class="text-blue-800 hover:text-blue-600 underline"><strong>2600Hz</strong></a> tone.</li>
+                <li>If the tone is detected, the "TRUNK SEIZED" LED will light up, and you'll disconnect from the local exchange.</li>
+                <li>The system is now open. Silence will reconnect the dial tone.</li>
+                <li>Press <strong>Hang Up</strong> to reset the system at any time.</li>
+            </ol>
+        </div>
+
+        <!-- Footer -->
+        <div class="text-center mt-4 text-gray-700 text-sm">
+             <p><a href="https://kmcd.dev" target="_blank" class="text-blue-800 hover:text-blue-600 underline">kmcd.dev</a></p>
+        </div>
+
+    </div>
+
+    <script>
+        // --- DOM Elements ---
+        const startButton = document.getElementById('start-button');
+        const hangupButton = document.getElementById('hangup-button');
+        const play2600Button = document.getElementById('play-2600hz');
+        const display = document.getElementById('display');
+        const visualizerCanvas = document.getElementById('visualizer');
+        const statusLed = document.getElementById('status-led');
+        const statusText = document.getElementById('status-text');
+        const freqDisplay = document.getElementById('freq-display'); // New element
+
+        // --- Audio Context and Tone Generation ---
+        let audioContext;
+        let analyser;
+        let microphone;
+        let dialTone, busySignal, tone2600;
+        const canvasCtx = visualizerCanvas.getContext('2d');
+        
+        // --- Game State ---
+        const TARGET_FREQUENCY = 2600;
+        const FREQUENCY_TOLERANCE = 30; // How close the detected freq needs to be
+        const SILENCE_THRESHOLD = -70; // dB
+        let isRunning = false;
+        let isTrunkSeized = false;
+        let animationFrameId;
+
+        // --- Utility Functions ---
+        function logToDisplay(message) {
+            const p = document.createElement('p');
+            p.textContent = `> ${message}`;
+            display.appendChild(p);
+            display.scrollTop = display.scrollHeight;
+        }
+
+        // --- Sound Setup (Tone.js) ---
+        function setupSounds() {
+            // Use a low-pass filter to make sounds more "lo-fi" like a phone
+            const filter = new Tone.Filter(800, "lowpass").toDestination();
+
+            dialTone = new Tone.PolySynth(Tone.Synth, {
+                oscillator: { type: "sine" },
+                envelope: { attack: 0.005, decay: 0.1, sustain: 0.9, release: 1 },
+                volume: -20
+            }).connect(filter);
+
+            busySignal = new Tone.Synth({
+                oscillator: { type: "square" },
+                envelope: { attack: 0.005, decay: 0.1, sustain: 0.9, release: 0.1 },
+                volume: -18
+            }).connect(filter);
+
+            tone2600 = new Tone.Oscillator(2600, "sine").connect(filter);
+        }
+
+        function playDialTone() {
+            stopAllSounds();
+            dialTone.triggerAttack(["G4", "F4"]); // Common dial tone frequencies
+        }
+
+        function playBusySignal() {
+            stopAllSounds();
+            // This is a simplified busy signal effect
+            Tone.Transport.start();
+            new Tone.Loop(time => {
+                busySignal.triggerAttackRelease("A#4", "0.25s", time);
+            }, "0.5s").start(0);
+        }
+        
+        function stopAllSounds() {
+            if (dialTone) dialTone.releaseAll();
+            if (busySignal) busySignal.triggerRelease();
+            Tone.Transport.stop();
+            Tone.Transport.cancel();
+        }
+
+        // --- Audio Processing ---
+        async function startAudioProcessing() {
+            if (!audioContext) {
+                audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            }
+            if (audioContext.state === 'suspended') {
+                await audioContext.resume();
+            }
+
+            setupSounds();
+
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                microphone = audioContext.createMediaStreamSource(stream);
+                analyser = audioContext.createAnalyser();
+                analyser.fftSize = 4096; // Increased FFT size for better frequency resolution
+                microphone.connect(analyser);
+
+                isRunning = true;
+                isTrunkSeized = false;
+                logToDisplay("Mic access granted. System active.");
+                statusText.textContent = "DIAL TONE";
+                playDialTone();
+
+                visualize();
+                detectTone();
+
+            } catch (err) {
+                logToDisplay("Error accessing microphone.");
+                console.error('Error accessing microphone:', err);
+            }
+        }
+
+        function stopAudioProcessing() {
+            if (microphone) {
+                microphone.disconnect();
+                microphone.mediaStream.getTracks().forEach(track => track.stop());
+            }
+            if (animationFrameId) {
+                cancelAnimationFrame(animationFrameId);
+            }
+            if(audioContext && audioContext.state !== 'closed') {
+                audioContext.close();
+                audioContext = null;
+            }
+            stopAllSounds();
+            isRunning = false;
+            isTrunkSeized = false;
+            updateUIForHangup();
+            logToDisplay("System reset. Press START.");
+        }
+        
+        // --- Core Detection Logic ---
+        function detectTone() {
+            if (!analyser || !isRunning) return;
+
+            const bufferLength = analyser.frequencyBinCount;
+            const dataArray = new Float32Array(bufferLength);
+            analyser.getFloatFrequencyData(dataArray);
+
+            // Find peak frequency
+            let peak_volume = -Infinity;
+            let peak_index = -1;
+            for (let i = 0; i < bufferLength; i++) {
+                if (dataArray[i] > peak_volume) {
+                    peak_volume = dataArray[i];
+                    peak_index = i;
+                }
+            }
+            
+            // Check for silence
+            if (peak_volume < SILENCE_THRESHOLD) {
+                if (isTrunkSeized) {
+                    logToDisplay("Silence detected. Releasing trunk...");
+                    isTrunkSeized = false;
+                    statusLed.classList.remove('led-on');
+                    statusLed.classList.add('led-off');
+                    statusText.textContent = "DIAL TONE";
+                    playDialTone();
+                }
+                freqDisplay.textContent = '---'; // Reset on silence
+            } else {
+                 const peak_freq = peak_index * audioContext.sampleRate / analyser.fftSize;
+                 freqDisplay.textContent = Math.round(peak_freq); // Display the frequency
+                
+                 if (Math.abs(peak_freq - TARGET_FREQUENCY) < FREQUENCY_TOLERANCE) {
+                     if (!isTrunkSeized) {
+                        isTrunkSeized = true;
+                        logToDisplay("2600Hz DETECTED! TRUNK SEIZED.");
+                        statusLed.classList.add('led-on');
+                        statusLed.classList.remove('led-off');
+                        statusText.textContent = "TRUNK SEIZED";
+                        stopAllSounds();
+                        // A quick "ker-chunk" sound to indicate success
+                        busySignal.triggerAttackRelease("C2", "0.1s");
+                     }
+                 }
+            }
+
+            requestAnimationFrame(detectTone);
+        }
+
+
+        // --- UI Updates & Visualization ---
+        function updateUIForHangup() {
+             startButton.disabled = false;
+             startButton.classList.remove('opacity-50', 'cursor-not-allowed');
+             statusLed.classList.remove('led-on');
+             statusLed.classList.add('led-off');
+             statusText.textContent = "OFF-HOOK";
+             freqDisplay.textContent = '---'; // Reset frequency display
+             canvasCtx.clearRect(0, 0, visualizerCanvas.width, visualizerCanvas.height);
+             canvasCtx.fillStyle = '#1f2937';
+             canvasCtx.fillRect(0, 0, visualizerCanvas.width, visualizerCanvas.height);
+        }
+
+        function visualize() {
+            if (!analyser || !isRunning) return;
+
+            animationFrameId = requestAnimationFrame(visualize);
+
+            const bufferLength = analyser.frequencyBinCount;
+            const dataArray = new Uint8Array(bufferLength);
+            analyser.getByteFrequencyData(dataArray);
+
+            canvasCtx.fillStyle = '#111827'; // bg-gray-900
+            canvasCtx.fillRect(0, 0, visualizerCanvas.width, visualizerCanvas.height);
+
+            const barWidth = (visualizerCanvas.width / bufferLength) * 2.5;
+            let barHeight;
+            let x = 0;
+
+            for (let i = 0; i < bufferLength; i++) {
+                barHeight = dataArray[i];
+                
+                // Color based on state
+                if(isTrunkSeized) {
+                    canvasCtx.fillStyle = 'rgb(239, 68, 68)'; // red-500
+                } else {
+                    canvasCtx.fillStyle = 'rgb(59, 130, 246)'; // blue-500
+                }
+                
+                canvasCtx.fillRect(x, visualizerCanvas.height - barHeight / 2, barWidth, barHeight / 2);
+                x += barWidth + 1;
+            }
+        }
+        
+        // --- Event Listeners ---
+        startButton.addEventListener('click', async () => {
+            if (isRunning) return;
+            logToDisplay("Initializing...");
+            await Tone.start(); // Required by modern browsers
+            await startAudioProcessing();
+            startButton.disabled = true;
+            startButton.classList.add('opacity-50', 'cursor-not-allowed');
+        });
+
+        hangupButton.addEventListener('click', () => {
+            if (!isRunning) return;
+            logToDisplay("Hanging up...");
+            stopAudioProcessing();
+        });
+        
+        play2600Button.addEventListener('mousedown', () => {
+            if (!tone2600) setupSounds();
+            tone2600.start();
+        });
+        
+        play2600Button.addEventListener('mouseup', () => {
+            if(tone2600) tone2600.stop();
+        });
+
+        play2600Button.addEventListener('mouseleave', () => {
+            if(tone2600) tone2600.stop();
+        });
+
+        // Initial UI state
+        updateUIForHangup();
+        logToDisplay("System Idle.");
+        logToDisplay("Press START to begin.");
+
+    </script>
+</body>
+</html>
