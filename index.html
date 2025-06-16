@@ -95,9 +95,13 @@
 
         <!-- Controls and Status -->
         <div class="flex items-center justify-between mb-4">
-            <div class="flex items-center space-x-3">
+            <div class="flex items-center space-x-2"> 
                 <div id="status-led" class="led led-off"></div>
                 <span id="status-text" class="text-lg text-gray-700">OFF-HOOK</span>
+                <span id="mute-toggle-link" 
+                      class="text-sm text-blue-600 hover:text-blue-800 underline cursor-pointer hidden ml-1">
+                      {/* Content will be (mute) or (unmute) via JS */}
+                </span>
             </div>
             <button id="start-button" class="btn-phone bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded-lg">
                 Start
@@ -147,6 +151,7 @@
         const visualizerCanvas = document.getElementById('visualizer');
         const statusLed = document.getElementById('status-led');
         const statusText = document.getElementById('status-text');
+        const muteToggleLink = document.getElementById('mute-toggle-link');
         const freqDisplay = document.getElementById('freq-display'); // New element
 
         // --- Audio Context and Tone Generation ---
@@ -161,6 +166,7 @@
         const SILENCE_THRESHOLD = -70; // dB
         let isRunning = false;
         let isTrunkSeized = false;
+        let isDialToneMuted = false;
         let animationFrameId;
 
         // --- Utility Functions ---
@@ -200,13 +206,39 @@
             tone2600 = new Tone.Oscillator(2600, "sine").connect(filter);
         }
 
+        // --- UI Update Functions ---
+        function updateStatusDisplay(baseStatus) {
+            // baseStatus can be "DIAL TONE", "TRUNK SEIZED", "OFF-HOOK"
+            if (baseStatus === "DIAL TONE") {
+                if (isDialToneMuted) {
+                    statusText.textContent = "DIAL TONE MUTED";
+                    muteToggleLink.textContent = "(unmute)";
+                } else {
+                    statusText.textContent = "DIAL TONE";
+                    muteToggleLink.textContent = "(mute)";
+                }
+                muteToggleLink.classList.remove('hidden');
+            } else { // "TRUNK SEIZED" or "OFF-HOOK"
+                statusText.textContent = baseStatus;
+                muteToggleLink.classList.add('hidden');
+            }
+        }
+
         function playDialTone() {
+            updateStatusDisplay("DIAL TONE"); // Update text and link visibility first
+
+            if (isDialToneMuted) {
+                if (dialTone && typeof dialTone.releaseAll === 'function') {
+                    dialTone.releaseAll(); // Ensure it's stopped if it was somehow playing
+                }
+                return; // Don't play if muted
+            }
+            // If not muted:
             stopAllSounds();
             if (dialTone) {
                 dialTone.triggerAttack(["G4", "F4"]); // Common dial tone frequencies
             }
         }
-
         function playBusySignal() {
             stopAllSounds();
             if (busySignal) {
@@ -257,7 +289,7 @@
                 startButton.disabled = true;
                 startButton.classList.add('opacity-50', 'cursor-not-allowed');
                 logToDisplay("Mic access granted. System active.");
-                statusText.textContent = "DIAL TONE";
+                // statusText.textContent = "DIAL TONE"; // playDialTone will handle this via updateStatusDisplay
                 playDialTone();
 
                 visualize();
@@ -327,7 +359,7 @@
                     isTrunkSeized = false;
                     statusLed.classList.remove('led-on');
                     statusLed.classList.add('led-off');
-                    statusText.textContent = "DIAL TONE";
+                    // statusText.textContent = "DIAL TONE"; // playDialTone will handle this
                     playDialTone();
                 }
                 freqDisplay.textContent = '---'; // Reset on silence
@@ -341,7 +373,7 @@
                         logToDisplay("2600Hz DETECTED! TRUNK SEIZED.");
                         statusLed.classList.add('led-on');
                         statusLed.classList.remove('led-off');
-                        statusText.textContent = "TRUNK SEIZED";
+                        updateStatusDisplay("TRUNK SEIZED");
                         stopAllSounds();
                         if (busySignal) { 
                             // Schedule ker-chunk slightly after 'now' to give other sounds a moment to stop.
@@ -361,7 +393,7 @@
              startButton.classList.remove('opacity-50', 'cursor-not-allowed');
              statusLed.classList.remove('led-on');
              statusLed.classList.add('led-off');
-             statusText.textContent = "OFF-HOOK";
+             updateStatusDisplay("OFF-HOOK");
              freqDisplay.textContent = '---'; // Reset frequency display
              canvasCtx.clearRect(0, 0, visualizerCanvas.width, visualizerCanvas.height);
              canvasCtx.fillStyle = '#111827'; // Match visualizer's bg-gray-900
@@ -451,6 +483,26 @@
         });
         play2600Button.addEventListener('touchend', stopTone2600);
         play2600Button.addEventListener('touchcancel', stopTone2600);
+
+        muteToggleLink.addEventListener('click', () => {
+            isDialToneMuted = !isDialToneMuted; // Toggle the state
+
+            if (isDialToneMuted) {
+                logToDisplay("Dial tone muted.");
+                // If dial tone was playing (text would be "DIAL TONE" before mute), stop it.
+                if (dialTone && typeof dialTone.releaseAll === 'function') {
+                    dialTone.releaseAll(); // Stop dial tone if it's currently playing
+                }
+            } else {
+                logToDisplay("Dial tone unmuted.");
+                // If the system is in a state where dial tone should be playing, play it.
+                if (isRunning && !isTrunkSeized) {
+                    playDialTone(); // This will play it since isDialToneMuted is now false
+                }
+            }
+            // Update the display based on the new mute state, assuming base state is "DIAL TONE"
+            updateStatusDisplay("DIAL TONE");
+        });
 
         // Initial UI state
         updateUIForHangup();
