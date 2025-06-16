@@ -33,6 +33,9 @@
         body {
             font-family: 'VT323', monospace;
             touch-action: manipulation;
+            -webkit-text-size-adjust: 100%; /* Prevent iOS text size adjust */
+            -ms-text-size-adjust: 100%; /* IE10+ */
+            text-size-adjust: 100%; /* Standard */
         }
         .phone-body {
             background-color: #d2b48c; /* tan */
@@ -78,7 +81,7 @@
 </head>
 <body class="bg-gray-800 flex items-center justify-center min-h-screen p-4">
 
-    <div class="phone-body max-w-sm w-full p-6 rounded-2xl">
+    <div class="phone-body max-w-lg w-full p-6 rounded-2xl">
         
         <!-- Header -->
         <div class="text-center mb-4">
@@ -88,8 +91,6 @@
 
         <!-- Display Screen -->
         <div id="display" class="display-screen rounded-lg mb-4 font-mono">
-            <p>> System Idle.</p>
-            <p>> Press START to begin.</p>
         </div>
 
         <!-- Controls and Status -->
@@ -120,7 +121,7 @@
         <!-- Instructions -->
         <div class="mt-6 p-4 bg-tan-200 rounded-lg border border-gray-600 text-gray-800">
             <h3 class="font-bold text-lg mb-2">How to Use:</h3>
-            <ol class="list-decimal list-inside text-sm space-y-1">
+            <ol class="list-decimal list-inside text-base space-y-1">
                 <li>Press <strong>Start</strong> to activate the system and enable your microphone.</li>
                 <li>You'll hear a dial tone. The system is now listening.</li>
                 <li><strong>Whistle</strong> or use an external source to play a <a href="https://en.wikipedia.org/wiki/2600_hertz" target="_blank" class="text-blue-800 hover:text-blue-600 underline"><strong>2600Hz</strong></a> tone.</li>
@@ -149,12 +150,11 @@
         const freqDisplay = document.getElementById('freq-display'); // New element
 
         // --- Audio Context and Tone Generation ---
-        let audioContext;
         let analyser;
         let microphone;
         let dialTone, busySignal, tone2600;
         const canvasCtx = visualizerCanvas.getContext('2d');
-        
+
         // --- Game State ---
         const TARGET_FREQUENCY = 2600;
         const FREQUENCY_TOLERANCE = 30; // How close the detected freq needs to be
@@ -173,13 +173,22 @@
 
         // --- Sound Setup (Tone.js) ---
         function setupSounds() {
+            // Dispose of previous instances if they exist to prevent memory leaks or duplicate sounds
+            if (dialTone) dialTone.dispose();
+            if (busySignal) busySignal.dispose();
+            // tone2600 is an Oscillator, its destination is the filter.
+            // Disposing the filter (or the main context) will handle it,
+            // but explicit disposal is also fine if it were connected to destination directly.
+            if (tone2600) tone2600.dispose();
+
+
             // Use a low-pass filter to make sounds more "lo-fi" like a phone
             const filter = new Tone.Filter(800, "lowpass").toDestination();
 
             dialTone = new Tone.PolySynth(Tone.Synth, {
                 oscillator: { type: "sine" },
                 envelope: { attack: 0.005, decay: 0.1, sustain: 0.9, release: 1 },
-                volume: -20
+                volume: -40 // Further reduced volume for dial tone
             }).connect(filter);
 
             busySignal = new Tone.Synth({
@@ -193,77 +202,106 @@
 
         function playDialTone() {
             stopAllSounds();
-            dialTone.triggerAttack(["G4", "F4"]); // Common dial tone frequencies
+            if (dialTone) {
+                dialTone.triggerAttack(["G4", "F4"]); // Common dial tone frequencies
+            }
         }
 
         function playBusySignal() {
             stopAllSounds();
-            // This is a simplified busy signal effect
-            Tone.Transport.start();
-            new Tone.Loop(time => {
-                busySignal.triggerAttackRelease("A#4", "0.25s", time);
-            }, "0.5s").start(0);
+            if (busySignal) {
+                // This is a simplified busy signal effect
+                Tone.Transport.start();
+                new Tone.Loop(time => {
+                    // Ensure busySignal still exists and system is running, in case of rapid stop/start
+                    if (busySignal && isRunning) {
+                        busySignal.triggerAttackRelease("A#4", "0.25s", time);
+                    }
+                }, "0.5s").start(0);
+            }
         }
-        
+
         function stopAllSounds() {
-            if (dialTone) dialTone.releaseAll();
-            if (busySignal) busySignal.triggerRelease();
+            if (dialTone && typeof dialTone.releaseAll === 'function') {
+                dialTone.releaseAll();
+            }
+            if (busySignal && typeof busySignal.triggerRelease === 'function') {
+                busySignal.triggerRelease();
+            }
+            if (tone2600 && tone2600.state === "started") {
+                tone2600.stop();
+            }
             Tone.Transport.stop();
-            Tone.Transport.cancel();
+            Tone.Transport.cancel(); // Clears all scheduled events
         }
 
         // --- Audio Processing ---
         async function startAudioProcessing() {
-            if (!audioContext) {
-                audioContext = new (window.AudioContext || window.webkitAudioContext)();
-            }
-            if (audioContext.state === 'suspended') {
-                await audioContext.resume();
+            // Tone.start() should have been called by the user gesture (startButton click)
+            // and ensures Tone.context is active.
+            if (Tone.context.state === 'suspended') {
+                await Tone.context.resume(); // Resume if somehow still suspended
             }
 
             setupSounds();
 
             try {
                 const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-                microphone = audioContext.createMediaStreamSource(stream);
-                analyser = audioContext.createAnalyser();
+                microphone = Tone.context.createMediaStreamSource(stream);
+                analyser = Tone.context.createAnalyser();
                 analyser.fftSize = 4096; // Increased FFT size for better frequency resolution
                 microphone.connect(analyser);
 
                 isRunning = true;
                 isTrunkSeized = false;
+                startButton.disabled = true;
+                startButton.classList.add('opacity-50', 'cursor-not-allowed');
                 logToDisplay("Mic access granted. System active.");
                 statusText.textContent = "DIAL TONE";
                 playDialTone();
 
                 visualize();
                 detectTone();
-
             } catch (err) {
                 logToDisplay("Error accessing microphone.");
                 console.error('Error accessing microphone:', err);
+                stopAudioProcessing(); // Ensure cleanup if mic access fails
             }
         }
 
-        function stopAudioProcessing() {
+        async function stopAudioProcessing() { // Made function async
             if (microphone) {
                 microphone.disconnect();
                 microphone.mediaStream.getTracks().forEach(track => track.stop());
+                microphone = null;
+            }
+            if(analyser){
+                analyser.disconnect();
+                analyser = null;
             }
             if (animationFrameId) {
                 cancelAnimationFrame(animationFrameId);
+                animationFrameId = null;
             }
-            if(audioContext && audioContext.state !== 'closed') {
-                audioContext.close();
-                audioContext = null;
-            }
+
             stopAllSounds();
+            // Synths will be disposed by setupSounds() on next start.
+
             isRunning = false;
             isTrunkSeized = false;
             updateUIForHangup();
             logToDisplay("System reset. Press START.");
+
+            // Dispose of the entire Tone.js context and reset its 'started' state.
+            // This allows Tone.start() to create a fresh context on the next run.
+            // Tone.dispose() is async and handles closing the context.
+            // Call dispose() on the Tone.context instance.
+            // This cleans up Tone.js resources and closes the underlying native AudioContext.
+            if (Tone.context && typeof Tone.context.dispose === 'function' && Tone.context.state !== 'closed') {
+                await Tone.context.dispose();
+            }
         }
-        
+
         // --- Core Detection Logic ---
         function detectTone() {
             if (!analyser || !isRunning) return;
@@ -294,10 +332,10 @@
                 }
                 freqDisplay.textContent = '---'; // Reset on silence
             } else {
-                 const peak_freq = peak_index * audioContext.sampleRate / analyser.fftSize;
+                 const peak_freq = peak_index * Tone.context.sampleRate / analyser.fftSize;
                  freqDisplay.textContent = Math.round(peak_freq); // Display the frequency
-                
-                 if (Math.abs(peak_freq - TARGET_FREQUENCY) < FREQUENCY_TOLERANCE) {
+
+                 if (Math.abs(peak_freq - TARGET_FREQUENCY) < FREQUENCY_TOLERANCE && peak_volume > SILENCE_THRESHOLD - 10) { // Add a bit more volume check for tone detection
                      if (!isTrunkSeized) {
                         isTrunkSeized = true;
                         logToDisplay("2600Hz DETECTED! TRUNK SEIZED.");
@@ -305,8 +343,10 @@
                         statusLed.classList.remove('led-off');
                         statusText.textContent = "TRUNK SEIZED";
                         stopAllSounds();
-                        // A quick "ker-chunk" sound to indicate success
-                        busySignal.triggerAttackRelease("C2", "0.1s");
+                        if (busySignal) { 
+                            // Schedule ker-chunk slightly after 'now' to give other sounds a moment to stop.
+                            busySignal.triggerAttackRelease("C2", "0.1s", Tone.now() + 0.05); // Play 50ms in the future
+                        }
                      }
                  }
             }
@@ -324,8 +364,8 @@
              statusText.textContent = "OFF-HOOK";
              freqDisplay.textContent = '---'; // Reset frequency display
              canvasCtx.clearRect(0, 0, visualizerCanvas.width, visualizerCanvas.height);
-             canvasCtx.fillStyle = '#1f2937';
-             canvasCtx.fillRect(0, 0, visualizerCanvas.width, visualizerCanvas.height);
+             canvasCtx.fillStyle = '#111827'; // Match visualizer's bg-gray-900
+             canvasCtx.fillRect(0, 0, visualizerCanvas.width, visualizerCanvas.height); // Clear with bg color
         }
 
         function visualize() {
@@ -353,7 +393,7 @@
                 } else {
                     canvasCtx.fillStyle = 'rgb(59, 130, 246)'; // blue-500
                 }
-                
+
                 canvasCtx.fillRect(x, visualizerCanvas.height - barHeight / 2, barWidth, barHeight / 2);
                 x += barWidth + 1;
             }
@@ -363,30 +403,54 @@
         startButton.addEventListener('click', async () => {
             if (isRunning) return;
             logToDisplay("Initializing...");
-            await Tone.start(); // Required by modern browsers
-            await startAudioProcessing();
-            startButton.disabled = true;
-            startButton.classList.add('opacity-50', 'cursor-not-allowed');
+            try {
+                // If Tone.context exists (it should after first import/load)
+                // and has an 'open' method, call it. This is crucial for re-initializing
+                // the native AudioContext if it was closed by a previous dispose/close.
+                if (Tone.context && typeof Tone.context.open === 'function') {
+                    await Tone.context.open();
+                }
+                await Tone.start(); // Ensure AudioContext is started/resumed by user gesture.
+                logToDisplay("Audio context started.");
+                await startAudioProcessing(); // Now proceed with app-specific audio setup
+            } catch (error) {
+                logToDisplay("Error starting audio. Please try again.");
+                console.error("Error on Tone.start() or startAudioProcessing():", error);
+                // Optionally re-enable start button if start failed critically
+                startButton.disabled = false;
+                startButton.classList.remove('opacity-50', 'cursor-not-allowed');
+            }
         });
 
         hangupButton.addEventListener('click', () => {
             if (!isRunning) return;
             logToDisplay("Hanging up...");
-            stopAudioProcessing();
-        });
-        
-        play2600Button.addEventListener('mousedown', () => {
-            if (!tone2600) setupSounds();
-            tone2600.start();
-        });
-        
-        play2600Button.addEventListener('mouseup', () => {
-            if(tone2600) tone2600.stop();
+            stopAudioProcessing(); // Call the async function
         });
 
-        play2600Button.addEventListener('mouseleave', () => {
-            if(tone2600) tone2600.stop();
+        const playTone2600 = () => {
+            if (tone2600 && isRunning && tone2600.state !== "started") {
+                tone2600.start();
+            }
+        };
+
+        const stopTone2600 = () => {
+            if (tone2600 && tone2600.state === "started") {
+                tone2600.stop();
+            }
+        };
+
+        play2600Button.addEventListener('mousedown', playTone2600);
+        play2600Button.addEventListener('mouseup', stopTone2600);
+        play2600Button.addEventListener('mouseleave', stopTone2600); // Stop if mouse leaves while pressed
+
+        // Touch events for mobile
+        play2600Button.addEventListener('touchstart', (e) => {
+            e.preventDefault(); // Prevent triggering mouse events as well
+            playTone2600();
         });
+        play2600Button.addEventListener('touchend', stopTone2600);
+        play2600Button.addEventListener('touchcancel', stopTone2600);
 
         // Initial UI state
         updateUIForHangup();
