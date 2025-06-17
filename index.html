@@ -463,22 +463,22 @@
         // --- Event Listeners ---
         startButton.addEventListener('click', async () => {
             if (isRunning) return;
-            logToDisplay("Initializing (1/5)...");
+            logToDisplay("Initializing...");
             try {
                 // If Tone.context exists (it should after first import/load)
                 // and has an 'open' method, call it. This is crucial for re-initializing
                 // the native AudioContext if it was closed by a previous dispose/close.
                 if (Tone.context && typeof Tone.context.open === 'function') {
-                    logToDisplay("Initializing (2/5) - Opening context...");
+                    logToDisplay("Initializing - Opening context...");
                     await Tone.context.open();
-                    logToDisplay("Initializing (2/5) - Context opened.");
+                    logToDisplay("Initializing - Context opened.");
                 }
-                logToDisplay("Initializing (3/5) - Starting Tone...");
+                logToDisplay("Initializing - Starting Tone...");
                 await Tone.start(); // Ensure AudioContext is started/resumed by user gesture.
-                logToDisplay("Initializing (3/5) - Tone started.");
-                logToDisplay("Initializing (4/5) - Starting audio processing...");
+                logToDisplay("Initializing - Tone started.");
+                logToDisplay("Initializing - Starting audio processing...");
                 await startAudioProcessing(); // Now proceed with app-specific audio setup
-                logToDisplay("Initializing (5/5) - System ready.");
+                logToDisplay("Initializing - System ready.");
             } catch (error) {
                 let errorMessage = "Error starting audio.";
                 if (error instanceof Error) {
