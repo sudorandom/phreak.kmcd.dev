@@ -152,7 +152,7 @@
         const statusLed = document.getElementById('status-led');
         const statusText = document.getElementById('status-text');
         const muteToggleLink = document.getElementById('mute-toggle-link');
-        const freqDisplay = document.getElementById('freq-display'); // New element
+        const freqDisplay = document.getElementById('freq-display');
 
         // --- Audio Context and Tone Generation ---
         let analyser;
@@ -191,21 +191,26 @@
 
 
             // Use a low-pass filter to make sounds more "lo-fi" like a phone
-            const filter = new Tone.Filter(800, "lowpass").toDestination();
+            const loFiFilter = new Tone.Filter(800, "lowpass").toDestination(); // Renamed for clarity
 
             dialTone = new Tone.PolySynth(Tone.Synth, {
                 oscillator: { type: "sine" },
                 envelope: { attack: 0.005, decay: 0.1, sustain: 0.9, release: 1 },
                 volume: -40 // Further reduced volume for dial tone
-            }).connect(filter);
+            }).connect(loFiFilter);
 
             busySignal = new Tone.Synth({
                 oscillator: { type: "square" },
                 envelope: { attack: 0.005, decay: 0.1, sustain: 0.9, release: 0.1 },
                 volume: -18
-            }).connect(filter);
+            }).connect(loFiFilter);
 
-            tone2600 = new Tone.Oscillator(2600, "sine").connect(filter);
+            // The 2600Hz tone should be clear, so it bypasses the main lo-fi filter.
+            // It connects directly to the destination.
+            tone2600 = new Tone.Oscillator(2600, "sine").toDestination();
+            // If you wanted a very mild, separate filter for it, you could add one:
+            // const tone2600Filter = new Tone.Filter(10000, "lowpass").toDestination(); // Example: very high cutoff
+            // tone2600 = new Tone.Oscillator(2600, "sine").connect(tone2600Filter);
         }
 
         // --- UI Update Functions ---
@@ -332,7 +337,7 @@
             // Call dispose() on the Tone.context instance.
             // This cleans up Tone.js resources and closes the underlying native AudioContext.
             if (Tone.context && typeof Tone.context.dispose === 'function' && Tone.context.state !== 'closed') {
-                await Tone.context.dispose();
+                Tone.context.dispose(); // dispose() is synchronous
             }
         }
 
@@ -420,19 +425,28 @@
 
             animationFrameId = requestAnimationFrame(visualize);
 
-            const bufferLength = analyser.frequencyBinCount;
+            const bufferLength = analyser.frequencyBinCount; // e.g., 2048
             const dataArray = new Uint8Array(bufferLength);
             analyser.getByteFrequencyData(dataArray);
 
             canvasCtx.fillStyle = '#111827'; // bg-gray-900
             canvasCtx.fillRect(0, 0, visualizerCanvas.width, visualizerCanvas.height);
 
-            const barWidth = (visualizerCanvas.width / bufferLength) * 2.5;
-            let barHeight;
-            let x = 0;
+            const numBarsToDisplay = 128; // Choose a number of bars for the visualizer
+            // Ensure numBarsToDisplay doesn't exceed available bins, though unlikely with these numbers
+            const actualNumBars = Math.min(numBarsToDisplay, bufferLength); 
+            
+            const barWidth = visualizerCanvas.width / actualNumBars;
+            // Determine the step to sample across the frequency bins
+            const step = Math.floor(bufferLength / actualNumBars); 
 
-            for (let i = 0; i < bufferLength; i++) {
-                barHeight = dataArray[i];
+            let x = 0;
+            let barHeight;
+
+            for (let i = 0; i < actualNumBars; i++) {
+                // Sample the dataArray to get a value for the current bar
+                const dataArrayIndex = Math.min(i * step, bufferLength - 1); // Ensure index is within bounds
+                barHeight = dataArray[dataArrayIndex]; // Value from 0-255
                 
                 // Color based on state
                 if(isTrunkSeized) {
@@ -440,29 +454,38 @@
                 } else {
                     canvasCtx.fillStyle = 'rgb(59, 130, 246)'; // blue-500
                 }
-
-                canvasCtx.fillRect(x, visualizerCanvas.height - barHeight / 2, barWidth, barHeight / 2);
-                x += barWidth + 1;
+                const scaledHeight = (barHeight / 255) * visualizerCanvas.height; // Scale to canvas height
+                canvasCtx.fillRect(x, visualizerCanvas.height - scaledHeight, barWidth, scaledHeight);
+                x += barWidth;
             }
         }
         
         // --- Event Listeners ---
         startButton.addEventListener('click', async () => {
             if (isRunning) return;
-            logToDisplay("Initializing...");
+            logToDisplay("Initializing (1/5)...");
             try {
                 // If Tone.context exists (it should after first import/load)
                 // and has an 'open' method, call it. This is crucial for re-initializing
                 // the native AudioContext if it was closed by a previous dispose/close.
                 if (Tone.context && typeof Tone.context.open === 'function') {
+                    logToDisplay("Initializing (2/5) - Opening context...");
                     await Tone.context.open();
+                    logToDisplay("Initializing (2/5) - Context opened.");
                 }
+                logToDisplay("Initializing (3/5) - Starting Tone...");
                 await Tone.start(); // Ensure AudioContext is started/resumed by user gesture.
-                logToDisplay("Audio context started.");
+                logToDisplay("Initializing (3/5) - Tone started.");
+                logToDisplay("Initializing (4/5) - Starting audio processing...");
                 await startAudioProcessing(); // Now proceed with app-specific audio setup
+                logToDisplay("Initializing (5/5) - System ready.");
             } catch (error) {
-                logToDisplay("Error starting audio. Please try again.");
-                console.error("Error on Tone.start() or startAudioProcessing():", error);
+                let errorMessage = "Error starting audio.";
+                if (error instanceof Error) {
+                    errorMessage += ` Message: ${error.message}`;
+                }
+                logToDisplay(errorMessage + " Please try again.");
+                console.error("Error in startButton click handler:", error);
                 // Optionally re-enable start button if start failed critically
                 startButton.disabled = false;
                 startButton.classList.remove('opacity-50', 'cursor-not-allowed');
@@ -476,14 +499,34 @@
         });
 
         const playTone2600 = () => {
-            if (tone2600 && isRunning && tone2600.state !== "started") {
+            // Check if the system is running, tone2600 object exists, and it's not already started
+            if (isRunning && tone2600 && tone2600.state !== "started") {
+                // If the analyser node exists (meaning audio processing is active),
+                // connect the 2600Hz tone directly to it.
+                // This will feed the tone into the detection logic.
+                if (analyser) {
+                    tone2600.connect(analyser);
+                }
                 tone2600.start();
             }
         };
 
         const stopTone2600 = () => {
+            // Check if tone2600 object exists and it is currently started
             if (tone2600 && tone2600.state === "started") {
                 tone2600.stop();
+                // If the analyser node exists, disconnect the 2600Hz tone from it.
+                // This stops feeding the tone directly into the detection logic.
+                // The tone2600 remains connected to the main destination (speakers)
+                // until it's disposed or the context is disposed.
+                if (analyser) {
+                    try {
+                        tone2600.disconnect(analyser);
+                    } catch (e) {
+                        // console.warn("Could not disconnect tone2600 from analyser:", e);
+                        // This might happen if it wasn't connected or analyser is already null.
+                    }
+                }
             }
         };
 
