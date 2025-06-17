@@ -164,10 +164,12 @@
         const TARGET_FREQUENCY = 2600;
         const FREQUENCY_TOLERANCE = 30; // How close the detected freq needs to be
         const SILENCE_THRESHOLD = -70; // dB
+        const TONE_DURATION_THRESHOLD = 500; // milliseconds
         let isRunning = false;
         let isTrunkSeized = false;
         let isDialToneMuted = false;
         let animationFrameId;
+        let toneStartTime = null; // Timestamp for when 2600Hz tone detection began
 
         // --- Utility Functions ---
         function logToDisplay(message) {
@@ -351,36 +353,49 @@
                     peak_index = i;
                 }
             }
-            
-            // Check for silence
-            if (peak_volume < SILENCE_THRESHOLD) {
-                if (isTrunkSeized) {
-                    logToDisplay("Silence detected. Releasing trunk...");
-                    isTrunkSeized = false;
-                    statusLed.classList.remove('led-on');
-                    statusLed.classList.add('led-off');
-                    // statusText.textContent = "DIAL TONE"; // playDialTone will handle this
-                    playDialTone();
-                }
-                freqDisplay.textContent = '---'; // Reset on silence
-            } else {
-                 const peak_freq = peak_index * Tone.context.sampleRate / analyser.fftSize;
-                 freqDisplay.textContent = Math.round(peak_freq); // Display the frequency
+            const peak_freq = peak_index * Tone.context.sampleRate / analyser.fftSize;
 
-                 if (Math.abs(peak_freq - TARGET_FREQUENCY) < FREQUENCY_TOLERANCE && peak_volume > SILENCE_THRESHOLD - 10) { // Add a bit more volume check for tone detection
-                     if (!isTrunkSeized) {
-                        isTrunkSeized = true;
-                        logToDisplay("2600Hz DETECTED! TRUNK SEIZED.");
-                        statusLed.classList.add('led-on');
-                        statusLed.classList.remove('led-off');
-                        updateStatusDisplay("TRUNK SEIZED");
-                        stopAllSounds();
-                        if (busySignal) { 
-                            // Schedule ker-chunk slightly after 'now' to give other sounds a moment to stop.
-                            busySignal.triggerAttackRelease("C2", "0.1s", Tone.now() + 0.05); // Play 50ms in the future
+            const isToneCurrentlyDetected = Math.abs(peak_freq - TARGET_FREQUENCY) < FREQUENCY_TOLERANCE && peak_volume > SILENCE_THRESHOLD - 10;
+
+            if (isToneCurrentlyDetected) {
+                freqDisplay.textContent = Math.round(peak_freq); // Display frequency when tone is being detected
+                if (toneStartTime === null) {
+                    toneStartTime = Tone.now() * 1000; // Start timer (ms)
+                } else {
+                    const elapsedTime = (Tone.now() * 1000) - toneStartTime;
+                    if (elapsedTime >= TONE_DURATION_THRESHOLD) {
+                        if (!isTrunkSeized) {
+                            isTrunkSeized = true;
+                            logToDisplay("2600Hz DETECTED! TRUNK SEIZED.");
+                            statusLed.classList.add('led-on');
+                            statusLed.classList.remove('led-off');
+                            updateStatusDisplay("TRUNK SEIZED");
+                            stopAllSounds();
+                            if (busySignal) {
+                                busySignal.triggerAttackRelease("C2", "0.1s", Tone.now() + 0.05);
+                            }
+                            // No need to call playDialTone() here as the trunk is seized
                         }
-                     }
-                 }
+                    }
+                }
+            } else {
+                // Tone is not currently detected in this frame
+                toneStartTime = null; // Reset timer
+
+                if (peak_volume < SILENCE_THRESHOLD) {
+                    if (isTrunkSeized) {
+                        logToDisplay("Silence detected. Releasing trunk...");
+                        isTrunkSeized = false;
+                        statusLed.classList.remove('led-on');
+                        statusLed.classList.add('led-off');
+                        // playDialTone() also calls updateStatusDisplay("DIAL TONE")
+                        playDialTone();
+                    }
+                    freqDisplay.textContent = '---'; // Reset on silence
+                } else {
+                    // Not silent, and not the target tone, just display the current peak frequency
+                    freqDisplay.textContent = Math.round(peak_freq);
+                }
             }
 
             requestAnimationFrame(detectTone);
