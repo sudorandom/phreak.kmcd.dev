@@ -236,9 +236,8 @@
             // The 2600Hz tone should be clear, so it bypasses the main lo-fi filter.
             // It connects directly to the destination.
             tone2600 = new Tone.Oscillator(TARGET_FREQUENCY, "sine").toDestination();
-            // If you wanted a very mild, separate filter for it, you could add one:
-            // const tone2600Filter = new Tone.Filter(10000, "lowpass").toDestination(); // Example: very high cutoff
-            // tone2600 = new Tone.Oscillator(2600, "sine").connect(tone2600Filter);
+            tone2600.volume.value = -14;
+            tone2600.toDestination();
         }
 
         // --- UI Update Functions ---
