@@ -84,10 +84,15 @@
 
     <div class="phone-body max-w-lg w-full p-6 rounded-2xl">
         
-        <!-- Header -->
-        <div class="text-center mb-4">
-            <h1 class="text-4xl text-gray-800">Phreak-Box 2600</h1>
-            <p class="text-gray-700">A Vintage TelCo Emulator</p>
+        <!-- Header and Mode Selector -->
+        <div class="text-center mb-1">
+            <h1 class="text-4xl text-gray-800">Phreak-Box</h1>
+            <p class="text-gray-700 mb-2">A Vintage TelCo Emulator</p>
+            <div class="flex justify-center items-center space-x-3 mb-3">
+                <span class="text-gray-700 text-sm">Mode:</span>
+                <img id="flag-us" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 900 600'%3E%3Crect width='900' height='600' fill='%23fff'/%3E%3Crect width='900' height='46.15' y='0' fill='%23B22234'/%3E%3Crect width='900' height='46.15' y='92.3' fill='%23B22234'/%3E%3Crect width='900' height='46.15' y='184.6' fill='%23B22234'/%3E%3Crect width='900' height='46.15' y='276.9' fill='%23B22234'/%3E%3Crect width='900' height='46.15' y='369.2' fill='%23B22234'/%3E%3Crect width='900' height='46.15' y='461.5' fill='%23B22234'/%3E%3Crect width='900' height='46.15' y='553.8' fill='%23B22234'/%3E%3Crect width='360' height='323.05' y='0' fill='%233C3B6E'/%3E%3C/svg%3E" alt="US Flag" class="h-6 w-auto cursor-pointer" title="US Mode (2600Hz)">
+                <img id="flag-uk" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 60 30'%3E%3CclipPath id='a'%3E%3Cpath d='M0 0h60v30H0z'/%3E%3C/clipPath%3E%3Cg clip-path='url(%23a)'%3E%3Cpath d='M0 0h60v30H0z' fill='%23012169'/%3E%3Cpath d='M0 0l60 30m0-30L0 30' stroke='%23fff' stroke-width='6'/%3E%3Cpath d='M0 0l60 30m0-30L0 30' stroke='%23C8102E' stroke-width='4'/%3E%3Cpath d='M30 0v30M0 15h60' stroke='%23fff' stroke-width='10'/%3E%3Cpath d='M30 0v30M0 15h60' stroke='%23C8102E' stroke-width='6'/%3E%3C/g%3E%3C/svg%3E" alt="UK Flag" class="h-6 w-auto cursor-pointer" title="British Mode (2280Hz)">
+            </div>
         </div>
 
         <!-- Display Screen -->
@@ -119,8 +124,8 @@
 
         <!-- Tone Buttons -->
         <div class="grid grid-cols-2 gap-4">
-            <button id="play-2600hz" class="btn-phone bg-yellow-500 hover:bg-yellow-600 text-black font-bold py-3 px-4 rounded-lg text-lg">Play 2600Hz Tone</button>
-            <button id="hangup-button" class="btn-phone btn-hook-up text-white font-bold py-3 px-4 rounded-lg text-lg">Hang Up</button>
+            <button id="play-target-tone-button" class="btn-phone bg-yellow-500 hover:bg-yellow-600 text-black font-bold py-3 px-4 rounded-lg text-lg">Play 2600Hz Tone</button>
+            <button id="hangup-button" class="btn-phone btn-hook-up text-white font-bold py-3 px-4 rounded-lg text-lg whitespace-nowrap">Hang Up</button>
         </div>
         
         <!-- Instructions -->
@@ -129,7 +134,7 @@
             <ol class="list-decimal list-inside text-base space-y-1">
                 <li>Press <strong>Start</strong> to activate the system and enable your microphone.</li>
                 <li>You'll hear a dial tone. The system is now listening.</li>
-                <li><strong>Whistle</strong> or use an external source to play a <a href="https://en.wikipedia.org/wiki/2600_hertz" target="_blank" class="text-blue-800 hover:text-blue-600 underline"><strong>2600Hz</strong></a> tone.</li>
+                <li><strong>Whistle</strong> or use an external source to play a <a id="instruction-freq-link" href="https://en.wikipedia.org/wiki/2600_hertz" target="_blank" class="text-blue-800 hover:text-blue-600 underline"><strong id="instruction-freq-text">2600Hz</strong></a> tone.</li>
                 <li>If the tone is detected, the "TRUNK SEIZED" LED will light up, and you'll disconnect from the local exchange.</li>
                 <li>The system is now open. Silence will reconnect the dial tone.</li>
                 <li>Press <strong>Hang Up</strong> to reset the system at any time.</li>
@@ -147,25 +152,47 @@
         // --- DOM Elements ---
         const startButton = document.getElementById('start-button');
         const hangupButton = document.getElementById('hangup-button');
-        const play2600Button = document.getElementById('play-2600hz');
+        const playTargetToneButton = document.getElementById('play-target-tone-button');
         const display = document.getElementById('display');
         const visualizerCanvas = document.getElementById('visualizer');
         const statusLed = document.getElementById('status-led');
         const statusText = document.getElementById('status-text');
         const muteToggleLink = document.getElementById('mute-toggle-link');
         const freqDisplay = document.getElementById('freq-display');
+        const flagUS = document.getElementById('flag-us');
+        const flagUK = document.getElementById('flag-uk');
+        const instructionFreqText = document.getElementById('instruction-freq-text');
+        const instructionFreqLink = document.getElementById('instruction-freq-link');
 
         // --- Audio Context and Tone Generation ---
         let analyser;
         let microphone;
         let dialTone, busySignal, tone2600;
         const canvasCtx = visualizerCanvas.getContext('2d');
+        
+        // --- Mode Configuration ---
+        const MODES = {
+            US: {
+                name: "US",
+                frequency: 2600,
+                wikilink: "https://en.wikipedia.org/wiki/2600_hertz",
+                displayName: "2600Hz"
+            },
+            UK: {
+                name: "British",
+                frequency: 2280,
+                wikilink: "https://www.britishtelephones.com/pwover1.htm",
+                displayName: "2280Hz"
+            }
+        };
+        let currentModeKey = 'US'; // 'US' or 'UK'
 
         // --- Game State ---
-        const TARGET_FREQUENCY = 2600;
+        let TARGET_FREQUENCY = MODES[currentModeKey].frequency; // Initial target frequency
         const FREQUENCY_TOLERANCE = 30; // How close the detected freq needs to be
         const SILENCE_THRESHOLD = -70; // dB
         const TONE_DURATION_THRESHOLD = 500; // milliseconds
+
         let isRunning = false;
         let isTrunkSeized = false;
         let isDialToneMuted = false;
@@ -208,7 +235,7 @@
 
             // The 2600Hz tone should be clear, so it bypasses the main lo-fi filter.
             // It connects directly to the destination.
-            tone2600 = new Tone.Oscillator(2600, "sine").toDestination();
+            tone2600 = new Tone.Oscillator(TARGET_FREQUENCY, "sine").toDestination();
             // If you wanted a very mild, separate filter for it, you could add one:
             // const tone2600Filter = new Tone.Filter(10000, "lowpass").toDestination(); // Example: very high cutoff
             // tone2600 = new Tone.Oscillator(2600, "sine").connect(tone2600Filter);
@@ -371,8 +398,8 @@
                     const elapsedTime = (Tone.now() * 1000) - toneStartTime;
                     if (elapsedTime >= TONE_DURATION_THRESHOLD) {
                         if (!isTrunkSeized) {
-                            isTrunkSeized = true;
-                            logToDisplay("2600Hz DETECTED! TRUNK SEIZED.");
+                            isTrunkSeized = true;                            
+                            logToDisplay(`${TARGET_FREQUENCY}Hz DETECTED! TRUNK SEIZED.`);
                             statusLed.classList.add('led-on');
                             statusLed.classList.remove('led-off');
                             updateStatusDisplay("TRUNK SEIZED");
@@ -499,20 +526,20 @@
             stopAudioProcessing(); // Call the async function
         });
 
-        const playTone2600 = () => {
+        const playTargetFrequencyTone = () => {
             // Check if the system is running, tone2600 object exists, and it's not already started
             if (isRunning && tone2600 && tone2600.state !== "started") {
                 // If the analyser node exists (meaning audio processing is active),
                 // connect the 2600Hz tone directly to it.
                 // This will feed the tone into the detection logic.
-                if (analyser) {
+                if (analyser && tone2600.numberOfOutputs > 0) { // Check if it has outputs before connecting
                     tone2600.connect(analyser);
                 }
                 tone2600.start();
             }
         };
 
-        const stopTone2600 = () => {
+        const stopTargetFrequencyTone = () => {
             // Check if tone2600 object exists and it is currently started
             if (tone2600 && tone2600.state === "started") {
                 tone2600.stop();
@@ -521,7 +548,7 @@
                 // The tone2600 remains connected to the main destination (speakers)
                 // until it's disposed or the context is disposed.
                 if (analyser) {
-                    try {
+                    try { // It might have multiple connections, only disconnect from analyser
                         tone2600.disconnect(analyser);
                     } catch (e) {
                         // console.warn("Could not disconnect tone2600 from analyser:", e);
@@ -531,20 +558,20 @@
             }
         };
 
-        play2600Button.addEventListener('mousedown', playTone2600);
-        play2600Button.addEventListener('mouseup', stopTone2600);
-        play2600Button.addEventListener('mouseleave', stopTone2600); // Stop if mouse leaves while pressed
+        playTargetToneButton.addEventListener('mousedown', playTargetFrequencyTone);
+        playTargetToneButton.addEventListener('mouseup', stopTargetFrequencyTone);
+        playTargetToneButton.addEventListener('mouseleave', stopTargetFrequencyTone); // Stop if mouse leaves while pressed
 
         // Touch events for mobile
-        play2600Button.addEventListener('touchstart', (e) => {
+        playTargetToneButton.addEventListener('touchstart', (e) => {
             e.preventDefault(); // Prevent triggering mouse events as well
-            playTone2600();
+            playTargetFrequencyTone();
         });
-        play2600Button.addEventListener('touchend', stopTone2600);
-        play2600Button.addEventListener('touchcancel', stopTone2600);
+        playTargetToneButton.addEventListener('touchend', stopTargetFrequencyTone);
+        playTargetToneButton.addEventListener('touchcancel', stopTargetFrequencyTone);
 
         muteToggleLink.addEventListener('click', () => {
-            isDialToneMuted = !isDialToneMuted; // Toggle the state
+            isDialToneMuted = !isDialToneMuted; 
 
             if (isDialToneMuted) {
                 logToDisplay("Dial tone muted.");
@@ -563,11 +590,47 @@
             updateStatusDisplay("DIAL TONE");
         });
 
+        // --- Mode Switching Logic ---
+        function updateModeUI() {
+            const modeConfig = MODES[currentModeKey];
+            TARGET_FREQUENCY = modeConfig.frequency;
+
+            flagUS.style.opacity = (currentModeKey === 'US') ? '1' : '0.6';
+            flagUS.style.borderBottom = (currentModeKey === 'US') ? '2px solid #3b82f6' : '2px solid transparent';
+            flagUK.style.opacity = (currentModeKey === 'UK') ? '1' : '0.6';
+            flagUK.style.borderBottom = (currentModeKey === 'UK') ? '2px solid #3b82f6' : '2px solid transparent';
+            
+            instructionFreqText.textContent = modeConfig.displayName;
+            instructionFreqLink.href = modeConfig.wikilink;
+            playTargetToneButton.textContent = `Play ${modeConfig.displayName} Tone`;
+
+            // If tone2600 oscillator exists (i.e., system has been started at least once), update its frequency
+            if (tone2600) {
+                tone2600.frequency.setValueAtTime(TARGET_FREQUENCY, Tone.now());
+            }
+        }
+
+        function switchMode(newModeKey) {
+            if (currentModeKey === newModeKey) return;
+            currentModeKey = newModeKey;
+            
+            logToDisplay(`Switched to ${MODES[currentModeKey].name} mode (${MODES[currentModeKey].frequency}Hz).`);
+            updateModeUI();
+            
+            // If the system is running and trunk is seized, it remains seized.
+            // User would need to hang up or cause silence to reset to dial tone with new mode's context.
+            // If dial tone is playing, it continues. The detection logic will now use the new TARGET_FREQUENCY.
+        }
+
+        flagUS.addEventListener('click', () => switchMode('US'));
+        flagUK.addEventListener('click', () => switchMode('UK'));
+
+
         // Initial UI state
         updateUIForHangup();
+        updateModeUI(); // Set initial mode display (flags, button text, instructions)
         logToDisplay("System Idle.");
         logToDisplay("Press START to begin.");
-
     </script>
 </body>
 </html>
