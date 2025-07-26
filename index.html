@@ -1,635 +1,565 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Phone Phreak Emulator</title>
-    <meta name="description" content="Test your phreaking skills by hacking this phone line." />
-    <meta name="author" content="Kevin McDonald" />
-
-    <!-- Open Graph / Facebook -->
-    <meta property="og:type" content="website" />
-    <meta property="og:url" content="https://phreak.kmcd.dev/" />
-    <meta property="og:title" content="Phone Phreak Emulator" />
-    <meta property="og:description" content="Test your phreaking skills by hacking this phone line." />
-    <meta property="og:image" content="https://phreak.kmcd.dev/social.png" />
-
-    <!-- Twitter -->
-    <meta property="twitter:card" content="summary_large_image" />
-    <meta property="twitter:url" content="https://phreak.kmcd.dev/" />
-    <meta property="twitter:title" content="Phone Phreak Emulator" />
-    <meta property="twitter:description" content="Test your phreaking skills by hacking this phone line." />
-    <meta property="twitter:image" content="https://phreak.kmcd.dev/social.png" />
-
-    <!-- Favicon - Optional but recommended -->
-    <!-- <link rel="icon" href="/favicon.ico" sizes="any"> -->
-    <link rel="icon" href="/favicon.svg" type="image/svg+xml">
-    <!-- <link rel="apple-touch-icon" href="/apple-touch-icon.png"> -->
-
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.7.77/Tone.js"></script>
-    <link href="https://fonts.googleapis.com/css2?family=VT323&display=swap" rel="stylesheet">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>The Fax Tone Forger</title>
+    <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
     <style>
         body {
-            font-family: 'VT323', monospace;
-            touch-action: manipulation;
-            -webkit-text-size-adjust: 100%; /* Prevent iOS text size adjust */
-            -ms-text-size-adjust: 100%; /* IE10+ */
-            text-size-adjust: 100%; /* Standard */
+            font-family: 'Press Start 2P', monospace; background-color: #0d1a0d; color: #0f0;
+            display: flex; justify-content: center; align-items: flex-start;
+            min-height: 100vh; margin: 0; padding: 20px 0; box-sizing: border-box;
+            user-select: none; -webkit-user-select: none;
         }
-        .phone-body {
-            background-color: #d2b48c; /* tan */
-            border: 4px solid #8b4513; /* saddlebrown */
-            box-shadow: 10px 10px 5px rgba(0,0,0,0.5), inset 0 0 15px rgba(0,0,0,0.3);
+        #game-container {
+            border: 4px solid #080; box-shadow: 0 0 15px #0f0; padding: 20px; text-align: center;
+            background-color: #000; width: 90vw; max-width: 600px; display: flex; flex-direction: column;
+            justify-content: flex-start; align-items: center; border-radius: 8px; position: relative; gap: 15px;
         }
-        .display-screen {
-            background-color: #334155; /* slate-700 */
-            border: 3px solid #1e293b; /* slate-800 */
-            color: #fde047; /* yellow-300 */
-            text-shadow: 0 0 5px #fde047, 0 0 10px #fde047;
-            padding: 1rem;
-            height: 120px;
-            overflow-y: auto;
-            font-size: 1.25rem;
+        #game-container::before {
+            content: ''; position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background: linear-gradient(rgba(0, 255, 0, 0.05) 1px, transparent 1px);
+            background-size: 100% 2px; pointer-events: none; z-index: 10;
         }
-        .btn-phone {
-            transition: all 0.1s ease;
-            box-shadow: 0 4px #6b7280;
-            border-bottom: 1px solid #4b5563;
+        h1 { font-size: 1.5em; margin-bottom: 0; color: #0a0; }
+        #practice-nav { display: flex; gap: 10px; width: 100%; justify-content: center; flex-wrap: wrap; }
+        #instructions, #message-box {
+            margin: 0; padding: 10px; border: 2px dashed #060; background-color: #001100;
+            color: #0f0; width: calc(100% - 24px); text-align: left; font-size: 0.8em; line-height: 1.4;
         }
-        .btn-phone:active {
-            transform: translateY(4px);
-            box-shadow: 0 0 #6b7280;
+        #final-image-container img { max-width: 100%; border: 2px solid #080; image-rendering: pixelated; }
+        #message-box.success { color: #0f0; border-color: #0f0; }
+        #message-box.error { color: #f00; border-color: #f00; }
+        #visualizer-container {
+            width: 100%; aspect-ratio: 4 / 3; background-color: #111; border: 1px solid #080;
+            position: relative; margin: 0; display: flex; flex-direction: column; justify-content: flex-end;
         }
-        .btn-hook-up {
-             background-color: #ef4444; /* red-500 */
-             border-color: #b91c1c; /* red-700 */
+        #image-visualizer-container {
+            width: 100%; height: 80px; background: #000; border: 1px solid #080;
+            margin-top: 10px; display: none; position: relative;
         }
-        .btn-hook-down {
-             background-color: #22c55e; /* green-500 */
-             border-color: #15803d; /* green-700 */
+        canvas { display: block; width: 100%; height: 100%; background-color: transparent; position: absolute; top: 0; left: 0; z-index: 1; image-rendering: pixelated; }
+        #overlay-canvas {
+            z-index: 2;
+            pointer-events: none;
         }
-        .led {
-            width: 15px;
-            height: 15px;
-            border-radius: 50%;
-            transition: background-color 0.3s ease;
+        .freq-line { position: absolute; left: 0; width: 100%; height: 2px; z-index: 5; }
+        #frequency-marker { background-color: rgba(255, 255, 0, 0.8); }
+        #detected-hz, #timer-display { position: absolute; color: #fff; font-size: 0.9em; background-color: rgba(0, 0, 0, 0.5); padding: 3px 6px; border-radius: 3px; z-index: 10; }
+        #detected-hz { bottom: 5px; right: 5px; }
+        #timer-display { top: 5px; left: 5px; display: none; }
+        .controls { margin-top: 0; display: flex; flex-wrap: wrap; justify-content: center; gap: 15px; width: 100%; }
+        button, #download-link {
+            font-family: 'Press Start 2P', monospace; background-color: #040; color: #0f0; border: 2px solid #080;
+            padding: 12px 20px; cursor: pointer; font-size: 0.9em; transition: all 0.2s;
+            box-shadow: 3px 3px 0px #0a0; border-radius: 4px; flex: 1 1 auto; max-width: 200px;
+            text-align: center; text-decoration: none;
         }
-        .led-off { background-color: #4b5563; box-shadow: inset 0 0 5px rgba(0,0,0,0.5);}
-        .led-on { background-color: #ef4444; box-shadow: 0 0 10px #ef4444, 0 0 20px #ef4444; }
+        #practice-nav button { padding: 8px 12px; font-size: 0.7em; }
+        button:hover:not(:disabled), #download-link:hover { background-color: #0a0; color: #000; border-color: #0f0; box-shadow: 3px 3px 0px #0f0; }
+        button:active:not(:disabled), #download-link:active { background-color: #0f0; color: #000; box-shadow: none; transform: translate(3px, 3px); }
+        button:disabled { background-color: #222; color: #555; border-color: #333; cursor: not-allowed; box-shadow: none; transform: none; }
     </style>
     <script src="https://analytics.ahrefs.com/analytics.js" data-key="2eNO7jS4q3dKAsgvccIzbw" async></script>
 </head>
-<body class="bg-gray-800 flex items-center justify-center min-h-screen p-4">
-
-    <div class="phone-body max-w-lg w-full p-6 rounded-2xl">
-        
-        <!-- Header and Mode Selector -->
-        <div class="text-center mb-1">
-            <h1 class="text-4xl text-gray-800">Phreak-Box</h1>
-            <p class="text-gray-700 mb-2">A Vintage TelCo Emulator</p>
-            <div class="flex justify-center items-center space-x-3 mb-3">
-                <span class="text-gray-700 text-sm">Mode:</span>
-                <img id="flag-us" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 900 600'%3E%3Crect width='900' height='600' fill='%23fff'/%3E%3Crect width='900' height='46.15' y='0' fill='%23B22234'/%3E%3Crect width='900' height='46.15' y='92.3' fill='%23B22234'/%3E%3Crect width='900' height='46.15' y='184.6' fill='%23B22234'/%3E%3Crect width='900' height='46.15' y='276.9' fill='%23B22234'/%3E%3Crect width='900' height='46.15' y='369.2' fill='%23B22234'/%3E%3Crect width='900' height='46.15' y='461.5' fill='%23B22234'/%3E%3Crect width='900' height='46.15' y='553.8' fill='%23B22234'/%3E%3Crect width='360' height='323.05' y='0' fill='%233C3B6E'/%3E%3C/svg%3E" alt="US Flag" class="h-6 w-auto cursor-pointer" title="US Mode (2600Hz)">
-                <img id="flag-uk" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 60 30'%3E%3CclipPath id='a'%3E%3Cpath d='M0 0h60v30H0z'/%3E%3C/clipPath%3E%3Cg clip-path='url(%23a)'%3E%3Cpath d='M0 0h60v30H0z' fill='%23012169'/%3E%3Cpath d='M0 0l60 30m0-30L0 30' stroke='%23fff' stroke-width='6'/%3E%3Cpath d='M0 0l60 30m0-30L0 30' stroke='%23C8102E' stroke-width='4'/%3E%3Cpath d='M30 0v30M0 15h60' stroke='%23fff' stroke-width='10'/%3E%3Cpath d='M30 0v30M0 15h60' stroke='%23C8102E' stroke-width='6'/%3E%3C/g%3E%3C/svg%3E" alt="UK Flag" class="h-6 w-auto cursor-pointer" title="British Mode (2280Hz)">
-            </div>
+<body>
+    <div id="game-container">
+        <h1>THE FAX TONE FORGER</h1>
+        <div id="practice-nav">
+             <button id="practice-1-button">PRACTICE: TONE 1</button>
+             <button id="practice-2-button">PRACTICE: TONE 2</button>
+             <button id="practice-drawing-button">PRACTICE: DRAWING</button>
+             <button id="return-to-mission-button" style="display: none;">RETURN TO MISSION</button>
         </div>
-
-        <!-- Display Screen -->
-        <div id="display" class="display-screen rounded-lg mb-4 font-mono">
+        <div id="instructions">Welcome!</div>
+        <div id="visualizer-container">
+            <canvas id="main-canvas"></canvas>
+            <canvas id="overlay-canvas"></canvas>
+            <div id="frequency-marker" class="freq-line" style="display: none;"></div>
+            <span id="timer-display">TIME: 00</span>
+            <span id="detected-hz">Hz: ---</span>
         </div>
-
-        <!-- Controls and Status -->
-        <div class="flex items-center justify-between mb-4">
-            <div class="flex items-center space-x-2"> 
-                <div id="status-led" class="led led-off"></div>
-                <span id="status-text" class="text-lg text-gray-700">OFF-HOOK</span>
-                <span id="mute-toggle-link" 
-                      class="text-sm text-blue-600 hover:text-blue-800 underline cursor-pointer hidden ml-1">
-                      {/* Content will be (mute) or (unmute) via JS */}
-                </span>
-            </div>
-            <button id="start-button" class="btn-phone bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded-lg">
-                Start
-            </button>
+        <div id="image-visualizer-container">
+            <canvas id="image-visualizer-canvas"></canvas>
         </div>
-
-        <!-- Audio Visualizer -->
-        <canvas id="visualizer" class="w-full h-20 bg-gray-900 rounded-lg mb-2"></canvas>
-        
-        <!-- Frequency Display -->
-        <div class="text-center mb-4 text-gray-700">
-            <p>Detected Frequency: <span id="freq-display" class="font-bold text-lg text-gray-800">---</span> Hz</p>
+        <div id="final-image-container"></div>
+        <p id="message-box"></p>
+        <div class="controls">
+            <button id="play-tone-button">PLAY TONE</button>
+            <button id="start-button">START FORGING</button>
+            <button id="retry-button" style="display: none;">RETRY MISSION</button>
+            <a id="download-link" style="display: none;">DOWNLOAD FAX</a>
         </div>
-
-        <!-- Tone Buttons -->
-        <div class="grid grid-cols-2 gap-4">
-            <button id="play-target-tone-button" class="btn-phone bg-yellow-500 hover:bg-yellow-600 text-black font-bold py-3 px-4 rounded-lg text-lg">Play 2600Hz Tone</button>
-            <button id="hangup-button" class="btn-phone btn-hook-up text-white font-bold py-3 px-4 rounded-lg text-lg whitespace-nowrap">Hang Up</button>
-        </div>
-        
-        <!-- Instructions -->
-        <div class="mt-6 p-4 bg-tan-200 rounded-lg border border-gray-600 text-gray-800">
-            <h3 class="font-bold text-lg mb-2">How to Use:</h3>
-            <ol class="list-decimal list-inside text-base space-y-1">
-                <li>Press <strong>Start</strong> to activate the system and enable your microphone.</li>
-                <li>You'll hear a dial tone. The system is now listening.</li>
-                <li><strong>Whistle</strong> or use an external source to play a <a id="instruction-freq-link" href="https://en.wikipedia.org/wiki/2600_hertz" target="_blank" class="text-blue-800 hover:text-blue-600 underline"><strong id="instruction-freq-text">2600Hz</strong></a> tone.</li>
-                <li>If the tone is detected, the "TRUNK SEIZED" LED will light up, and you'll disconnect from the local exchange.</li>
-                <li>The system is now open. Silence will reconnect the dial tone.</li>
-                <li>Press <strong>Hang Up</strong> to reset the system at any time.</li>
-            </ol>
-        </div>
-
-        <!-- Footer -->
-        <div class="text-center mt-4 text-gray-700 text-sm">
-             <p><a href="https://kmcd.dev" target="_blank" class="text-blue-800 hover:text-blue-600 underline">kmcd.dev</a></p>
-        </div>
-
     </div>
 
     <script>
-        // --- DOM Elements ---
-        const startButton = document.getElementById('start-button');
-        const hangupButton = document.getElementById('hangup-button');
-        const playTargetToneButton = document.getElementById('play-target-tone-button');
-        const display = document.getElementById('display');
-        const visualizerCanvas = document.getElementById('visualizer');
-        const statusLed = document.getElementById('status-led');
-        const statusText = document.getElementById('status-text');
-        const muteToggleLink = document.getElementById('mute-toggle-link');
-        const freqDisplay = document.getElementById('freq-display');
-        const flagUS = document.getElementById('flag-us');
-        const flagUK = document.getElementById('flag-uk');
-        const instructionFreqText = document.getElementById('instruction-freq-text');
-        const instructionFreqLink = document.getElementById('instruction-freq-link');
+        // --- Global State Variables ---
+        let audioContext, analyser, microphone, oscillator;
+        let frequencyData, animationFrameId, countdownInterval, imageTransmissionInterval;
+        let isListeningToUser = false, isPracticing = false, isTransmittingImage = false, isMissionMode = false;
+        let levelTimeoutDuration = 0, timeRemaining = 0;
+        let targetFrequency = 0, requiredDuration = 0, toneMatchStartTime = 0;
+        let level3Phase = ''; // Can be 'cng_await' or 'v21_await'
+        const IMAGE_WIDTH = 64, IMAGE_HEIGHT = 48, PIXEL_DRAW_INTERVAL = 10;
+        let pixelX = 0, pixelY = 0;
+        let noiseCoordinates = [];
+        const IMG_MIN_FREQ = 300, IMG_MAX_FREQ = 1500;
+        const FREQ_TOLERANCE = 75, MAX_VIZ_FREQ = 4000;
 
-        // --- Audio Context and Tone Generation ---
-        let analyser;
-        let microphone;
-        let dialTone, busySignal, tone2600;
-        const canvasCtx = visualizerCanvas.getContext('2d');
+        // --- DOM Element References ---
+        const instructionsDisplay = document.getElementById('instructions'), messageBox = document.getElementById('message-box');
+        const mainCanvas = document.getElementById('main-canvas'), mainCtx = mainCanvas.getContext('2d');
+        const overlayCanvas = document.getElementById('overlay-canvas'), overlayCtx = overlayCanvas.getContext('2d');
+        const visualizerContainer = document.getElementById('visualizer-container');
+        const frequencyMarker = document.getElementById('frequency-marker');
+        const playToneButton = document.getElementById('play-tone-button'), startButton = document.getElementById('start-button');
+        const retryButton = document.getElementById('retry-button'), downloadLink = document.getElementById('download-link');
+        const imageVisualizerContainer = document.getElementById('image-visualizer-container'), imageVisualizerCanvas = document.getElementById('image-visualizer-canvas'), imageVisualizerCtx = imageVisualizerCanvas.getContext('2d');
+        const finalImageContainer = document.getElementById('final-image-container');
+        const detectedHzDisplay = document.getElementById('detected-hz'), timerDisplay = document.getElementById('timer-display');
+        const returnToMissionButton = document.getElementById('return-to-mission-button');
         
-        // --- Mode Configuration ---
-        const MODES = {
-            US: {
-                name: "US",
-                frequency: 2600,
-                wikilink: "https://en.wikipedia.org/wiki/2600_hertz",
-                displayName: "2600Hz"
-            },
-            UK: {
-                name: "British",
-                frequency: 2280,
-                wikilink: "https://www.britishtelephones.com/pwover1.htm",
-                displayName: "2280Hz"
-            }
-        };
-        let currentModeKey = 'US'; // 'US' or 'UK'
-
-        // --- Game State ---
-        let TARGET_FREQUENCY = MODES[currentModeKey].frequency; // Initial target frequency
-        const FREQUENCY_TOLERANCE = 30; // How close the detected freq needs to be
-        const SILENCE_THRESHOLD = -70; // dB
-        const TONE_DURATION_THRESHOLD = 500; // milliseconds
-
-        let isRunning = false;
-        let isTrunkSeized = false;
-        let isDialToneMuted = false;
-        let animationFrameId;
-        let toneStartTime = null; // Timestamp for when 2600Hz tone detection began
-
         // --- Utility Functions ---
-        function logToDisplay(message) {
-            const p = document.createElement('p');
-            p.textContent = `> ${message}`;
-            display.appendChild(p);
-            display.scrollTop = display.scrollHeight;
-        }
-
-        // --- Sound Setup (Tone.js) ---
-        function setupSounds() {
-            // Dispose of previous instances if they exist to prevent memory leaks or duplicate sounds
-            if (dialTone) dialTone.dispose();
-            if (busySignal) busySignal.dispose();
-            // tone2600 is an Oscillator, its destination is the filter.
-            // Disposing the filter (or the main context) will handle it,
-            // but explicit disposal is also fine if it were connected to destination directly.
-            if (tone2600) tone2600.dispose();
-
-
-            // Use a low-pass filter to make sounds more "lo-fi" like a phone
-            const loFiFilter = new Tone.Filter(800, "lowpass").toDestination(); // Renamed for clarity
-
-            dialTone = new Tone.PolySynth(Tone.Synth, {
-                oscillator: { type: "sine" },
-                envelope: { attack: 0.005, decay: 0.1, sustain: 0.9, release: 1 },
-                volume: -40 // Further reduced volume for dial tone
-            }).connect(loFiFilter);
-
-            busySignal = new Tone.Synth({
-                oscillator: { type: "square" },
-                envelope: { attack: 0.005, decay: 0.1, sustain: 0.9, release: 0.1 },
-                volume: -18
-            }).connect(loFiFilter);
-
-            // The 2600Hz tone should be clear, so it bypasses the main lo-fi filter.
-            // It connects directly to the destination.
-            tone2600 = new Tone.Oscillator(TARGET_FREQUENCY, "sine").toDestination();
-            tone2600.volume.value = -14;
-            tone2600.toDestination();
-        }
-
-        // --- UI Update Functions ---
-        function updateStatusDisplay(baseStatus) {
-            // baseStatus can be "DIAL TONE", "TRUNK SEIZED", "OFF-HOOK"
-            if (baseStatus === "DIAL TONE") {
-                if (isDialToneMuted) {
-                    statusText.textContent = "DIAL TONE MUTED";
-                    muteToggleLink.textContent = "(unmute)";
-                } else {
-                    statusText.textContent = "DIAL TONE";
-                    muteToggleLink.textContent = "(mute)";
-                }
-                muteToggleLink.classList.remove('hidden');
-            } else { // "TRUNK SEIZED" or "OFF-HOOK"
-                statusText.textContent = baseStatus;
-                muteToggleLink.classList.add('hidden');
-            }
-        }
-
-        function playDialTone() {
-            updateStatusDisplay("DIAL TONE"); // Update text and link visibility first
-
-            if (isDialToneMuted) {
-                if (dialTone && typeof dialTone.releaseAll === 'function') {
-                    dialTone.releaseAll(); // Ensure it's stopped if it was somehow playing
-                }
-                return; // Don't play if muted
-            }
-            // If not muted:
-            stopAllSounds();
-            if (dialTone) {
-                dialTone.triggerAttack(["G4", "F4"]); // Common dial tone frequencies
-            }
-        }
-        function playBusySignal() {
-            stopAllSounds();
-            if (busySignal) {
-                // This is a simplified busy signal effect
-                Tone.Transport.start();
-                new Tone.Loop(time => {
-                    // Ensure busySignal still exists and system is running, in case of rapid stop/start
-                    if (busySignal && isRunning) {
-                        busySignal.triggerAttackRelease("A#4", "0.25s", time);
-                    }
-                }, "0.5s").start(0);
-            }
-        }
-
-        function stopAllSounds() {
-            if (dialTone && typeof dialTone.releaseAll === 'function') {
-                dialTone.releaseAll();
-            }
-            if (busySignal && typeof busySignal.triggerRelease === 'function') {
-                busySignal.triggerRelease();
-            }
-            if (tone2600 && tone2600.state === "started") {
-                tone2600.stop();
-            }
-            Tone.Transport.stop();
-            Tone.Transport.cancel(); // Clears all scheduled events
-        }
-
-        // --- Audio Processing ---
-        async function startAudioProcessing() {
-            // Tone.start() should have been called by the user gesture (startButton click)
-            // and ensures Tone.context is active.
-            if (Tone.context.state === 'suspended') {
-                await Tone.context.resume(); // Resume if somehow still suspended
-            }
-
-            setupSounds();
-
+        function showMessage(msg, type = 'info') { messageBox.textContent = msg; messageBox.className = type; }
+        
+        async function ensureAudioContextReady() {
             try {
-                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-                microphone = Tone.context.createMediaStreamSource(stream);
-                analyser = Tone.context.createAnalyser();
-                analyser.fftSize = 4096; // Increased FFT size for better frequency resolution
-                microphone.connect(analyser);
-
-                isRunning = true;
-                isTrunkSeized = false;
-                startButton.disabled = true;
-                startButton.classList.add('opacity-50', 'cursor-not-allowed');
-                logToDisplay("Mic access granted. System active.");
-                // statusText.textContent = "DIAL TONE"; // playDialTone will handle this via updateStatusDisplay
-                playDialTone();
-
-                visualize();
-                detectTone();
-            } catch (err) {
-                logToDisplay("Error accessing microphone.");
-                console.error('Error accessing microphone:', err);
-                stopAudioProcessing(); // Ensure cleanup if mic access fails
-            }
+                if (!audioContext) audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                if (audioContext.state === 'suspended') await audioContext.resume();
+                if (!analyser) { analyser = audioContext.createAnalyser(); analyser.fftSize = 2048; frequencyData = new Uint8Array(analyser.frequencyBinCount); }
+                return true;
+            } catch (err) { showMessage(`Error: Could not initialize audio.`, 'error'); return false; }
         }
 
-        async function stopAudioProcessing() { // Made function async
-            if (microphone) {
-                microphone.disconnect();
-                microphone.mediaStream.getTracks().forEach(track => track.stop());
-                microphone = null;
+        async function startMicrophoneInput() {
+            if (!(await ensureAudioContextReady())) return false;
+            try {
+                if (!microphone?.mediaStream?.active) {
+                    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                    microphone = audioContext.createMediaStreamSource(stream); microphone.connect(analyser);
+                }
+                isListeningToUser = true; if (!animationFrameId) requestAnimationFrame(gameLoop); return true;
+            } catch (err) { showMessage(`Error: Microphone access denied.`, 'error'); isListeningToUser = false; return false; }
+        }
+
+        function stopMicrophone() { microphone?.mediaStream?.getTracks().forEach(track => track.stop()); isListeningToUser = false; }
+        
+        function getDominantFrequency() {
+            if (!analyser) return 0;
+            analyser.getByteFrequencyData(frequencyData); let maxVol = -1; let dominantFreq = 0;
+            for (let i = 0; i < analyser.frequencyBinCount; i++) {
+                const vol = frequencyData[i];
+                if (vol > maxVol) { maxVol = vol; dominantFreq = i * (audioContext.sampleRate / 2 / analyser.frequencyBinCount); }
             }
-            if(analyser){
-                analyser.disconnect();
-                analyser = null;
-            }
-            if (animationFrameId) {
-                cancelAnimationFrame(animationFrameId);
+            if (maxVol < 10) return 0; return dominantFreq;
+        }
+
+        function resizeCanvases() {
+            mainCanvas.width = mainCanvas.offsetWidth; mainCanvas.height = mainCanvas.offsetHeight;
+            overlayCanvas.width = overlayCanvas.offsetWidth; overlayCanvas.height = overlayCanvas.offsetHeight;
+            imageVisualizerCanvas.width = imageVisualizerCanvas.offsetWidth; imageVisualizerCanvas.height = imageVisualizerCanvas.offsetHeight;
+            updateFrequencyMarker();
+        }
+
+        // --- Core Game Loop ---
+        function gameLoop() {
+            const shouldRun = isListeningToUser || isPracticing || isTransmittingImage;
+            if (!shouldRun) {
                 animationFrameId = null;
+                mainCtx.clearRect(0, 0, mainCanvas.width, mainCanvas.height);
+                detectedHzDisplay.textContent = `Hz: ---`; return;
             }
-
-            stopAllSounds();
-            // Synths will be disposed by setupSounds() on next start.
-
-            isRunning = false;
-            isTrunkSeized = false;
-            updateUIForHangup();
-            logToDisplay("System reset. Press START.");
-
-            // Dispose of the entire Tone.js context and reset its 'started' state.
-            // This allows Tone.start() to create a fresh context on the next run.
-            // Tone.dispose() is async and handles closing the context.
-            // Call dispose() on the Tone.context instance.
-            // This cleans up Tone.js resources and closes the underlying native AudioContext.
-            if (Tone.context && typeof Tone.context.dispose === 'function' && Tone.context.state !== 'closed') {
-                Tone.context.dispose(); // dispose() is synchronous
-            }
-        }
-
-        // --- Core Detection Logic ---
-        function detectTone() {
-            if (!analyser || !isRunning) return;
-
-            const bufferLength = analyser.frequencyBinCount;
-            const dataArray = new Float32Array(bufferLength);
-            analyser.getFloatFrequencyData(dataArray);
-
-            // Find peak frequency
-            let peak_volume = -Infinity;
-            let peak_index = -1;
-            for (let i = 0; i < bufferLength; i++) {
-                if (dataArray[i] > peak_volume) {
-                    peak_volume = dataArray[i];
-                    peak_index = i;
-                }
-            }
-            const peak_freq = peak_index * Tone.context.sampleRate / analyser.fftSize;
-
-            const isToneCurrentlyDetected = Math.abs(peak_freq - TARGET_FREQUENCY) < FREQUENCY_TOLERANCE && peak_volume > SILENCE_THRESHOLD - 10;
-
-            if (isToneCurrentlyDetected) {
-                freqDisplay.textContent = Math.round(peak_freq); // Display frequency when tone is being detected
-                if (toneStartTime === null) {
-                    toneStartTime = Tone.now() * 1000; // Start timer (ms)
-                } else {
-                    const elapsedTime = (Tone.now() * 1000) - toneStartTime;
-                    if (elapsedTime >= TONE_DURATION_THRESHOLD) {
-                        if (!isTrunkSeized) {
-                            isTrunkSeized = true;                            
-                            logToDisplay(`${TARGET_FREQUENCY}Hz DETECTED! TRUNK SEIZED.`);
-                            statusLed.classList.add('led-on');
-                            statusLed.classList.remove('led-off');
-                            updateStatusDisplay("TRUNK SEIZED");
-                            stopAllSounds();
-                            if (busySignal) {
-                                busySignal.triggerAttackRelease("C2", "0.1s", Tone.now() + 0.05);
-                            }
-                            // No need to call playDialTone() here as the trunk is seized
-                        }
-                    }
-                }
-            } else {
-                // Tone is not currently detected in this frame
-                toneStartTime = null; // Reset timer
-
-                if (peak_volume < SILENCE_THRESHOLD) {
-                    if (isTrunkSeized) {
-                        logToDisplay("Silence detected. Releasing trunk...");
-                        isTrunkSeized = false;
-                        statusLed.classList.remove('led-on');
-                        statusLed.classList.add('led-off');
-                        // playDialTone() also calls updateStatusDisplay("DIAL TONE")
-                        playDialTone();
-                    }
-                    freqDisplay.textContent = '---'; // Reset on silence
-                } else {
-                    // Not silent, and not the target tone, just display the current peak frequency
-                    freqDisplay.textContent = Math.round(peak_freq);
-                }
-            }
-
-            requestAnimationFrame(detectTone);
-        }
-
-
-        // --- UI Updates & Visualization ---
-        function updateUIForHangup() {
-             startButton.disabled = false;
-             startButton.classList.remove('opacity-50', 'cursor-not-allowed');
-             statusLed.classList.remove('led-on');
-             statusLed.classList.add('led-off');
-             updateStatusDisplay("OFF-HOOK");
-             freqDisplay.textContent = '---'; // Reset frequency display
-             canvasCtx.clearRect(0, 0, visualizerCanvas.width, visualizerCanvas.height);
-             canvasCtx.fillStyle = '#111827'; // Match visualizer's bg-gray-900
-             canvasCtx.fillRect(0, 0, visualizerCanvas.width, visualizerCanvas.height); // Clear with bg color
-        }
-
-        function visualize() {
-            if (!analyser || !isRunning) return;
-
-            animationFrameId = requestAnimationFrame(visualize);
-
-            const bufferLength = analyser.frequencyBinCount; // e.g., 2048
-            const dataArray = new Uint8Array(bufferLength);
-            analyser.getByteFrequencyData(dataArray);
-
-            canvasCtx.fillStyle = '#111827'; // bg-gray-900
-            canvasCtx.fillRect(0, 0, visualizerCanvas.width, visualizerCanvas.height);
-
-            const numBarsToDisplay = 128; // Choose a number of bars for the visualizer
-            // Ensure numBarsToDisplay doesn't exceed available bins, though unlikely with these numbers
-            const actualNumBars = Math.min(numBarsToDisplay, bufferLength); 
+            animationFrameId = requestAnimationFrame(gameLoop);
             
-            const barWidth = visualizerCanvas.width / actualNumBars;
-            // Determine the step to sample across the frequency bins
-            const step = Math.floor(bufferLength / actualNumBars); 
+            const dominantFreq = getDominantFrequency();
+            detectedHzDisplay.textContent = dominantFreq > 0 ? `Hz: ${Math.round(dominantFreq)}` : `Hz: ---`;
 
-            let x = 0;
-            let barHeight;
+            if (isTransmittingImage) {
+                drawFrequencyGuide(dominantFreq);
+                drawScanline();
+            } else if (isPracticing) {
+                drawMainVisualizer(dominantFreq);
+            } else {
+                drawMainVisualizer(dominantFreq);
+                if (isListeningToUser) checkToneMatch(dominantFreq);
+            }
+        }
 
-            for (let i = 0; i < actualNumBars; i++) {
-                // Sample the dataArray to get a value for the current bar
-                const dataArrayIndex = Math.min(i * step, bufferLength - 1); // Ensure index is within bounds
-                barHeight = dataArray[dataArrayIndex]; // Value from 0-255
-                
-                // Color based on state
-                if(isTrunkSeized) {
-                    canvasCtx.fillStyle = 'rgb(239, 68, 68)'; // red-500
-                } else {
-                    canvasCtx.fillStyle = 'rgb(59, 130, 246)'; // blue-500
-                }
-                const scaledHeight = (barHeight / 255) * visualizerCanvas.height; // Scale to canvas height
-                canvasCtx.fillRect(x, visualizerCanvas.height - scaledHeight, barWidth, scaledHeight);
+        // --- Drawing and Visualization ---
+        function drawMainVisualizer(dominantFreq) {
+            mainCtx.clearRect(0, 0, mainCanvas.width, mainCanvas.height);
+            mainCtx.fillStyle = '#000'; mainCtx.fillRect(0, 0, mainCanvas.width, mainCanvas.height);
+            if (!analyser) return;
+            const barWidth = mainCanvas.width / (analyser.frequencyBinCount / 4);
+            for (let i = 0, x = 0; i < analyser.frequencyBinCount; i++) {
+                const binFreq = i * (audioContext.sampleRate / 2 / analyser.frequencyBinCount);
+                if (binFreq > MAX_VIZ_FREQ) continue;
+                const barHeight = (frequencyData[i] / 255.0) * mainCanvas.height;
+                mainCtx.fillStyle = (targetFrequency > 0 && Math.abs(binFreq - targetFrequency) < FREQ_TOLERANCE) ? '#0f0' : '#0a0';
+                mainCtx.fillRect(x, mainCanvas.height - barHeight, barWidth, barHeight);
                 x += barWidth;
             }
         }
+
+        function updateFrequencyMarker() {
+            const markerY = mainCanvas.height - (targetFrequency / MAX_VIZ_FREQ) * mainCanvas.height;
+            frequencyMarker.style.top = `${markerY}px`;
+            frequencyMarker.style.display = targetFrequency > 0 && !isTransmittingImage ? 'block' : 'none';
+        }
+
+        function drawImagePixel() {
+            const isNoisePixel = noiseCoordinates.some(coord => coord.x === pixelX && coord.y === pixelY);
+            let gray;
+
+            if (isNoisePixel) {
+                gray = Math.random() < 0.5 ? 0 : 255;
+            } else {
+                let freq = getDominantFrequency();
+                gray = 128;
+                if (freq > 80 && freq < IMG_MIN_FREQ) gray = 0;
+                if (freq > IMG_MAX_FREQ) gray = 255;
+            }
+            
+            mainCtx.fillStyle = `rgb(${gray}, ${gray}, ${gray})`;
+            const pWidth = mainCanvas.width / IMAGE_WIDTH;
+            const pHeight = mainCanvas.height / IMAGE_HEIGHT;
+            mainCtx.fillRect(pixelX * pWidth, pixelY * pHeight, pWidth + 1, pHeight + 1);
+
+            pixelX++;
+            if (pixelX >= IMAGE_WIDTH) {
+                pixelX = 0;
+                pixelY++;
+                if (pixelY >= IMAGE_HEIGHT) {
+                    endImageTransmission();
+                }
+            }
+        }
+
+        function drawFrequencyGuide(freq) {
+            imageVisualizerCtx.clearRect(0, 0, imageVisualizerCanvas.width, imageVisualizerCanvas.height);
+            imageVisualizerCtx.fillStyle = '#000';
+            imageVisualizerCtx.fillRect(0, 0, imageVisualizerCanvas.width, imageVisualizerCanvas.height);
+            imageVisualizerCtx.font = "10px 'Press Start 2P'";
+            
+            imageVisualizerCtx.fillStyle = 'rgba(255, 255, 255, 0.5)';
+            const topY = imageVisualizerCanvas.height - (IMG_MAX_FREQ / MAX_VIZ_FREQ) * imageVisualizerCanvas.height;
+            imageVisualizerCtx.fillRect(0, topY, imageVisualizerCanvas.width, 1);
+            imageVisualizerCtx.fillText("WHITE", 5, topY - 5);
+            
+            const bottomY = imageVisualizerCanvas.height - (IMG_MIN_FREQ / MAX_VIZ_FREQ) * imageVisualizerCanvas.height;
+            imageVisualizerCtx.fillRect(0, bottomY, imageVisualizerCanvas.width, 1);
+            imageVisualizerCtx.fillText("BLACK", 5, bottomY + 15);
+
+            if (freq > 0) {
+                imageVisualizerCtx.fillStyle = '#ff0';
+                const currentY = imageVisualizerCanvas.height - (freq / MAX_VIZ_FREQ) * imageVisualizerCanvas.height;
+                imageVisualizerCtx.fillRect(0, currentY - 1, imageVisualizerCanvas.width, 3);
+            }
+        }
+
+        function drawScanline() {
+            overlayCtx.clearRect(0, 0, overlayCanvas.width, overlayCanvas.height);
+            const y = (pixelY / IMAGE_HEIGHT) * overlayCanvas.height;
+            overlayCtx.fillStyle = 'rgba(255, 255, 255, 0.2)';
+            overlayCtx.fillRect(0, y, overlayCanvas.width, 4);
+            overlayCtx.fillStyle = 'rgba(255, 255, 255, 0.8)';
+            overlayCtx.fillRect(0, y, overlayCanvas.width, 1);
+        }
+
+        // --- Tone Matching and Game Logic ---
+        function checkToneMatch(dominantFreq) {
+            if (targetFrequency > 0 && dominantFreq > 0 && Math.abs(dominantFreq - targetFrequency) < FREQ_TOLERANCE) {
+                if (toneMatchStartTime === 0) toneMatchStartTime = audioContext.currentTime;
+                const matchDuration = audioContext.currentTime - toneMatchStartTime;
+                const progress = Math.min(100, Math.floor(matchDuration / requiredDuration * 100));
+                showMessage(`FORGING... ${progress}%`, 'success');
+                if (matchDuration < requiredDuration) return;
+                
+                toneMatchStartTime = 0;
+                if (isMissionMode) {
+                    stopTimer();
+                    if (level3Phase === 'cng_await') {
+                        isListeningToUser = false; 
+                        startButton.disabled = true;
+                        showMessage("CNG tone matched! Machine is answering...", 'success');
+                        level3Phase = 'v21_await'; 
+                        playTone(2100, 2, () => { loadPrimaryMission(false); });
+                    } else if (level3Phase === 'v21_await') {
+                        missionSuccess();
+                    }
+                } else {
+                    stopMicrophone(); startButton.textContent = "START FORGING"; playToneButton.disabled = false;
+                    showMessage("Practice successful!", 'success');
+                    startButton.style.display = 'none'; playToneButton.style.display = 'none';
+                    if (targetFrequency === 1100) {
+                        retryButton.textContent = "PRACTICE TONE 2";
+                        retryButton.onclick = () => loadPracticeMode(2);
+                    } else {
+                        retryButton.textContent = "START MISSION";
+                        retryButton.onclick = () => loadPrimaryMission(true);
+                    }
+                    retryButton.style.display = 'inline-block';
+                }
+            } else { 
+                toneMatchStartTime = 0; 
+                if (isListeningToUser) showMessage(dominantFreq === 0 ? "No sound detected." : "Adjust your pitch!", 'info'); 
+            }
+        }
+
+        // --- Audio Playback ---
+        function togglePracticeTone() {
+            ensureAudioContextReady().then(ready => {
+                if (!ready || !targetFrequency || isListeningToUser) return;
+                if (isPracticing) { oscillator?.stop(); isPracticing = false; playToneButton.textContent = "PLAY TONE"; } 
+                else {
+                    isPracticing = true; playToneButton.textContent = "STOP TONE";
+                    oscillator = audioContext.createOscillator();
+                    oscillator.frequency.setValueAtTime(targetFrequency, audioContext.currentTime);
+                    const gainNode = audioContext.createGain(); gainNode.gain.setValueAtTime(0.5, audioContext.currentTime);
+                    oscillator.connect(gainNode).connect(audioContext.destination); gainNode.connect(analyser);
+                    oscillator.start(); if (!animationFrameId) requestAnimationFrame(gameLoop);
+                    oscillator.onended = () => { isPracticing = false; playToneButton.textContent = "PLAY TONE"; };
+                }
+            });
+        }
+
+        function playTone(frequency, duration, onEndedCallback) {
+            ensureAudioContextReady().then(ready => {
+                if (!ready) return;
+                const tempOsc = audioContext.createOscillator();
+                tempOsc.type = 'sine'; tempOsc.frequency.setValueAtTime(frequency, audioContext.currentTime);
+                const gainNode = audioContext.createGain(); gainNode.gain.setValueAtTime(0.5, audioContext.currentTime);
+                tempOsc.connect(gainNode).connect(audioContext.destination); tempOsc.start();
+                if (duration) { tempOsc.stop(audioContext.currentTime + duration); tempOsc.onended = () => onEndedCallback?.(); }
+            });
+        }
         
+        // --- Game State Management ---
+        function resetAllModes() {
+            if(oscillator) oscillator.stop();
+            stopMicrophone();
+            stopTimer();
+            isMissionMode = false;
+            isPracticing = false;
+            isTransmittingImage = false;
+            mainCtx.clearRect(0,0,mainCanvas.width, mainCanvas.height);
+            overlayCtx.clearRect(0,0,overlayCanvas.width, overlayCanvas.height);
+            visualizerContainer.style.display = 'flex';
+            finalImageContainer.innerHTML = '';
+        }
+
+        function loadPracticeMode(toneType) {
+            resetAllModes();
+            isPracticing = true;
+            playToneButton.style.display = 'inline-block';
+            startButton.style.display = 'inline-block';
+            retryButton.style.display = 'none';
+            downloadLink.style.display = 'none';
+            returnToMissionButton.style.display = 'inline-block';
+            startButton.textContent = 'START FORGING';
+            startButton.disabled = false;
+            playToneButton.disabled = false;
+
+            if (toneType === 1) {
+                targetFrequency = 1100; requiredDuration = 0.5;
+                instructionsDisplay.innerHTML = `<h3>PRACTICE: Calling Tone</h3><p>Hum at <strong>1100 Hz</strong> for 0.5s. No time limit.</p>`;
+                showMessage("Practice mode: 1100 Hz.", 'info');
+            } else {
+                targetFrequency = 300; requiredDuration = 1.7;
+                instructionsDisplay.innerHTML = `<h3>PRACTICE: Handshake Tone</h3><p>Hum at <strong>300 Hz</strong> for 1.7s. No time limit.</p>`;
+                showMessage("Practice mode: 300 Hz.", 'info');
+            }
+            updateFrequencyMarker();
+        }
+        
+        function loadDrawingPractice() {
+            resetAllModes();
+            isPracticing = true;
+            isTransmittingImage = true;
+            
+            startButton.style.display = 'none';
+            playToneButton.style.display = 'none';
+            retryButton.style.display = 'none';
+            downloadLink.style.display = 'none';
+            returnToMissionButton.style.display = 'inline-block';
+            
+            startImageTransmission(true);
+        }
+
+        function loadPrimaryMission(isNew=true) {
+            resetAllModes();
+            isMissionMode = true;
+            
+            playToneButton.style.display = 'none';
+            startButton.style.display = 'inline-block';
+            retryButton.style.display = 'none';
+            downloadLink.style.display = 'none';
+            imageVisualizerContainer.style.display = 'none';
+            returnToMissionButton.style.display = 'none';
+            startButton.textContent = 'START FORGING';
+            startButton.disabled = false;
+
+            if (isNew) {
+                level3Phase = 'cng_await';
+            }
+            
+            if (level3Phase === 'cng_await') {
+                targetFrequency = 1100; requiredDuration = 0.5; levelTimeoutDuration = 7;
+                instructionsDisplay.innerHTML = `<h3>PRIMARY MISSION: Part 1</h3><p>Forge the initial CNG tone (<strong>1100 Hz</strong>) to announce the call. You have <strong>${levelTimeoutDuration} seconds</strong>.</p>`;
+            } else if (level3Phase === 'v21_await') {
+                targetFrequency = 300; requiredDuration = 1.7; levelTimeoutDuration = 10;
+                instructionsDisplay.innerHTML = `<h3>PRIMARY MISSION: Part 2</h3><p>The machine answered! Synchronize the connection (<strong>300 Hz</strong>). You have <strong>${levelTimeoutDuration} seconds</strong>.</p>`;
+                
+                startMicrophoneInput().then(micReady => {
+                    if (micReady) {
+                        startTimer();
+                        startButton.textContent = 'ABORT MISSION';
+                        startButton.disabled = false;
+                    } else {
+                        levelFail("Mic failed to restart.");
+                    }
+                });
+            }
+            updateFrequencyMarker();
+        }
+
+        function missionSuccess() { startImageTransmission(false); }
+
+        function startTimer() {
+            stopTimer(); timeRemaining = levelTimeoutDuration;
+            timerDisplay.textContent = `TIME: ${String(timeRemaining).padStart(2, '0')}`;
+            timerDisplay.style.display = 'block';
+            countdownInterval = setInterval(() => {
+                timeRemaining--; timerDisplay.textContent = `TIME: ${String(timeRemaining).padStart(2, '0')}`;
+                if (timeRemaining <= 0) { levelFail("Time's up!"); }
+            }, 1000);
+        }
+
+        function stopTimer() { clearInterval(countdownInterval); timerDisplay.style.display = 'none'; }
+        
+        function levelFail(reason) {
+            stopTimer(); stopMicrophone(); if(oscillator) oscillator.stop();
+            isListeningToUser = false; isPracticing = false;
+            showMessage(`MISSION FAILED: ${reason}`, 'error');
+            startButton.style.display = 'none'; playToneButton.style.display = 'none';
+            retryButton.textContent = 'RETRY MISSION';
+            retryButton.style.display = 'inline-block';
+            retryButton.onclick = () => loadPrimaryMission(true);
+        }
+
+        function startImageTransmission(isPracticeRun = false) {
+            stopMicrophone(); stopTimer(); 
+            isTransmittingImage = true;
+            targetFrequency = 0; pixelX = 0; pixelY = 0;
+            
+            noiseCoordinates = [];
+            const noisePixelCount = Math.floor(Math.random() * 2) + 1;
+            for (let i = 0; i < noisePixelCount; i++) {
+                const noiseX = Math.floor(Math.random() * IMAGE_WIDTH);
+                const noiseY = Math.floor(Math.random() * IMAGE_HEIGHT);
+                noiseCoordinates.push({ x: noiseX, y: noiseY });
+            }
+            
+            visualizerContainer.style.display = 'flex';
+            imageVisualizerContainer.style.display = 'block';
+            
+            if (isPracticeRun) {
+                instructionsDisplay.innerHTML = "<h3>PRACTICE: IMAGE DRAWING</h3><p><strong>Vary your pitch to draw.</strong> Use the guide below. No time limit.</p>";
+                showMessage("Begin drawing practice.", 'info');
+            } else {
+                instructionsDisplay.innerHTML = "<h3>TRANSMIT IMAGE DATA</h3><p><strong>Vary your pitch to draw.</strong> Use the guide below: low pitch for BLACK, high for WHITE.</p>";
+                showMessage("BEGINNING IMAGE TRANSMISSION...", 'success');
+            }
+            
+            mainCtx.fillStyle = '#ccc'; 
+            mainCtx.fillRect(0, 0, mainCanvas.width, mainCanvas.height);
+            
+            updateFrequencyMarker(); 
+            if (!animationFrameId) requestAnimationFrame(gameLoop);
+
+            startMicrophoneInput().then((micReady) => { 
+                if (micReady) {
+                    imageTransmissionInterval = setInterval(drawImagePixel, PIXEL_DRAW_INTERVAL);
+                } else {
+                    levelFail("Mic failed for image transmission.");
+                }
+            });
+        }
+
+        function endImageTransmission() {
+            clearInterval(imageTransmissionInterval);
+            isTransmittingImage = false;
+            stopMicrophone();
+            
+            imageVisualizerContainer.style.display = 'none';
+            visualizerContainer.style.display = 'none';
+            overlayCtx.clearRect(0, 0, overlayCanvas.width, overlayCanvas.height);
+            
+            const imageDataUrl = mainCanvas.toDataURL('image/png');
+            finalImageContainer.innerHTML = `<img src="${imageDataUrl}" alt="Your Forged Fax">`;
+            
+            // --- FIX FOR DOWNLOAD BUTTON ---
+            downloadLink.href = "javascript:void(0);";
+            downloadLink.onclick = () => {
+                window.open(imageDataUrl, '_blank');
+            };
+            
+            if (isMissionMode) {
+                const transmissionDate = new Date();
+                instructionsDisplay.innerHTML = `<h3>TRANSMISSION COMPLETE</h3><p>DATE: ${transmissionDate.toLocaleDateString()}<br>TIME: ${transmissionDate.toLocaleTimeString()}<br>RESULT: SUCCESS</p>`;
+                showMessage("MISSION COMPLETE!", 'success');
+                retryButton.textContent = 'NEW MISSION';
+                retryButton.onclick = () => loadPrimaryMission(true);
+            } else {
+                instructionsDisplay.innerHTML = `<h3>DRAWING PRACTICE COMPLETE</h3><p>Here is your creation. You can practice again or return to the main mission.</p>`;
+                showMessage("Practice Complete!", 'success');
+                retryButton.textContent = 'PRACTICE AGAIN';
+                retryButton.onclick = loadDrawingPractice;
+                returnToMissionButton.style.display = 'inline-block';
+            }
+            
+            retryButton.style.display = 'inline-block';
+            downloadLink.style.display = 'inline-block';
+        }
+
         // --- Event Listeners ---
-        startButton.addEventListener('click', async () => {
-            if (isRunning) return;
-            logToDisplay("Initializing...");
-            try {
-                // If Tone.context exists (it should after first import/load)
-                // and has an 'open' method, call it. This is crucial for re-initializing
-                // the native AudioContext if it was closed by a previous dispose/close.
-                if (Tone.context && typeof Tone.context.open === 'function') {
-                    logToDisplay("Initializing - Opening context...");
-                    await Tone.context.open();
-                    logToDisplay("Initializing - Context opened.");
-                }
-                logToDisplay("Initializing - Starting Tone...");
-                await Tone.start(); // Ensure AudioContext is started/resumed by user gesture.
-                logToDisplay("Initializing - Tone started.");
-                logToDisplay("Initializing - Starting audio processing...");
-                await startAudioProcessing(); // Now proceed with app-specific audio setup
-                logToDisplay("Initializing - System ready.");
-            } catch (error) {
-                let errorMessage = "Error starting audio.";
-                if (error instanceof Error) {
-                    errorMessage += ` Message: ${error.message}`;
-                }
-                logToDisplay(errorMessage + " Please try again.");
-                console.error("Error in startButton click handler:", error);
-                // Optionally re-enable start button if start failed critically
-                startButton.disabled = false;
-                startButton.classList.remove('opacity-50', 'cursor-not-allowed');
-            }
-        });
+        window.addEventListener('DOMContentLoaded', () => {
+            document.body.addEventListener('click', ensureAudioContextReady, { once: true });
+            window.addEventListener('resize', resizeCanvases);
+            
+            document.getElementById('practice-1-button').addEventListener('click', () => loadPracticeMode(1));
+            document.getElementById('practice-2-button').addEventListener('click', () => loadPracticeMode(2));
+            document.getElementById('practice-drawing-button').addEventListener('click', loadDrawingPractice);
+            returnToMissionButton.addEventListener('click', () => loadPrimaryMission(true));
 
-        hangupButton.addEventListener('click', () => {
-            if (!isRunning) return;
-            logToDisplay("Hanging up...");
-            stopAudioProcessing(); // Call the async function
-        });
+            playToneButton.addEventListener('click', togglePracticeTone);
 
-        const playTargetFrequencyTone = () => {
-            // Check if the system is running, tone2600 object exists, and it's not already started
-            if (isRunning && tone2600 && tone2600.state !== "started") {
-                // If the analyser node exists (meaning audio processing is active),
-                // connect the 2600Hz tone directly to it.
-                // This will feed the tone into the detection logic.
-                if (analyser && tone2600.numberOfOutputs > 0) { // Check if it has outputs before connecting
-                    tone2600.connect(analyser);
-                }
-                tone2600.start();
-            }
-        };
-
-        const stopTargetFrequencyTone = () => {
-            // Check if tone2600 object exists and it is currently started
-            if (tone2600 && tone2600.state === "started") {
-                tone2600.stop();
-                // If the analyser node exists, disconnect the 2600Hz tone from it.
-                // This stops feeding the tone directly into the detection logic.
-                // The tone2600 remains connected to the main destination (speakers)
-                // until it's disposed or the context is disposed.
-                if (analyser) {
-                    try { // It might have multiple connections, only disconnect from analyser
-                        tone2600.disconnect(analyser);
-                    } catch (e) {
-                        // console.warn("Could not disconnect tone2600 from analyser:", e);
-                        // This might happen if it wasn't connected or analyser is already null.
+            startButton.addEventListener('click', async () => {
+                if (isListeningToUser) {
+                    if (isMissionMode) {
+                        levelFail("Mission Aborted by user.");
+                    } else {
+                        stopMicrophone();
+                        startButton.textContent = 'START FORGING';
+                        playToneButton.disabled = false;
+                    }
+                } else {
+                    const micReady = await startMicrophoneInput();
+                    if (micReady) {
+                        playToneButton.disabled = true;
+                        if (isMissionMode) {
+                            startTimer();
+                            startButton.textContent = 'ABORT MISSION';
+                        } else {
+                            startButton.textContent = 'STOP FORGING';
+                        }
                     }
                 }
-            }
-        };
+            });
 
-        playTargetToneButton.addEventListener('mousedown', playTargetFrequencyTone);
-        playTargetToneButton.addEventListener('mouseup', stopTargetFrequencyTone);
-        playTargetToneButton.addEventListener('mouseleave', stopTargetFrequencyTone); // Stop if mouse leaves while pressed
-
-        // Touch events for mobile
-        playTargetToneButton.addEventListener('touchstart', (e) => {
-            e.preventDefault(); // Prevent triggering mouse events as well
-            playTargetFrequencyTone();
+            loadPrimaryMission(true);
         });
-        playTargetToneButton.addEventListener('touchend', stopTargetFrequencyTone);
-        playTargetToneButton.addEventListener('touchcancel', stopTargetFrequencyTone);
-
-        muteToggleLink.addEventListener('click', () => {
-            isDialToneMuted = !isDialToneMuted; 
-
-            if (isDialToneMuted) {
-                logToDisplay("Dial tone muted.");
-                // If dial tone was playing (text would be "DIAL TONE" before mute), stop it.
-                if (dialTone && typeof dialTone.releaseAll === 'function') {
-                    dialTone.releaseAll(); // Stop dial tone if it's currently playing
-                }
-            } else {
-                logToDisplay("Dial tone unmuted.");
-                // If the system is in a state where dial tone should be playing, play it.
-                if (isRunning && !isTrunkSeized) {
-                    playDialTone(); // This will play it since isDialToneMuted is now false
-                }
-            }
-            // Update the display based on the new mute state, assuming base state is "DIAL TONE"
-            updateStatusDisplay("DIAL TONE");
-        });
-
-        // --- Mode Switching Logic ---
-        function updateModeUI() {
-            const modeConfig = MODES[currentModeKey];
-            TARGET_FREQUENCY = modeConfig.frequency;
-
-            flagUS.style.opacity = (currentModeKey === 'US') ? '1' : '0.6';
-            flagUS.style.borderBottom = (currentModeKey === 'US') ? '2px solid #3b82f6' : '2px solid transparent';
-            flagUK.style.opacity = (currentModeKey === 'UK') ? '1' : '0.6';
-            flagUK.style.borderBottom = (currentModeKey === 'UK') ? '2px solid #3b82f6' : '2px solid transparent';
-            
-            instructionFreqText.textContent = modeConfig.displayName;
-            instructionFreqLink.href = modeConfig.wikilink;
-            playTargetToneButton.textContent = `Play ${modeConfig.displayName} Tone`;
-
-            // If tone2600 oscillator exists (i.e., system has been started at least once), update its frequency
-            if (tone2600) {
-                tone2600.frequency.setValueAtTime(TARGET_FREQUENCY, Tone.now());
-            }
-        }
-
-        function switchMode(newModeKey) {
-            if (currentModeKey === newModeKey) return;
-            currentModeKey = newModeKey;
-            
-            logToDisplay(`Switched to ${MODES[currentModeKey].name} mode (${MODES[currentModeKey].frequency}Hz).`);
-            updateModeUI();
-            
-            // If the system is running and trunk is seized, it remains seized.
-            // User would need to hang up or cause silence to reset to dial tone with new mode's context.
-            // If dial tone is playing, it continues. The detection logic will now use the new TARGET_FREQUENCY.
-        }
-
-        flagUS.addEventListener('click', () => switchMode('US'));
-        flagUK.addEventListener('click', () => switchMode('UK'));
-
-
-        // Initial UI state
-        updateUIForHangup();
-        updateModeUI(); // Set initial mode display (flags, button text, instructions)
-        logToDisplay("System Idle.");
-        logToDisplay("Press START to begin.");
     </script>
 </body>
 </html>
